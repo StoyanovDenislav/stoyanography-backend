@@ -1,0 +1,66 @@
+app.use((req, res, next) => {
+  const allowedReferers = [
+    "http://localhost:3000",
+    "https://stoyanography.com",
+    "https://*.stoyanography.com",
+  ];
+  const referer = req.get("Referer") || req.get("Origin");
+
+  console.log("Referer:", referer);
+
+  const isAllowed = allowedReferers.some((allowed) => {
+    //const regex = new RegExp(`^${allowed.replace(/\*/g, ".*")}\/?$`);
+    const result = regex.test(referer);
+    console.log(`Testing ${referer} against ${regex}: ${result}`);
+    return result;
+  });
+
+  if (referer && isAllowed) {
+    next();
+  } else {
+    res.status(403).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Forbidden 403</title>
+        <style>
+          body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+          }
+          #rickroll {
+            opacity: 0;
+            transition: opacity 1s;
+          }
+        </style>
+      </head>
+      <body>
+        <h1 id="header">Forbidden 403</h1>
+        <video id="rickroll" width="1000" height="1000" controls autoplay muted>
+          <source src="https://cdn.mtdv.me/video/rick.mp4" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+        <script>
+          const video = document.getElementById('rickroll');
+          const header = document.getElementById('header');
+          setTimeout(() => {
+            header.textContent = "Never Gonna Give You Data";
+            video.muted = false;
+            video.currentTime = 0; // Rewind the video
+            video.style.opacity = 1;
+            video.play();
+          }, 2000); // 2-second delay
+
+         
+        </script>
+      </body>
+      </html>
+    `);
+  }
+});

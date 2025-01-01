@@ -1,0 +1,38 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "devStart": "set HTTPS=true&&nodemon app.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.5.0",
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.6",
+    "cookies": "^0.9.1",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "csrf": "^3.1.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.4",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "memfs": "^4.6.0",
+    "node-localstorage": "^3.0.5",
+    "node-sessionstorage": "^1.0.0",
+    "nodemailer": "^6.9.15",
+    "nodemon": "^3.0.1",
+    "orientjs": "^3.0.11",
+    "qrcode": "^1.5.3",
+    "speakeasy": "^2.0.0",
+    "store": "^2.0.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  }
+}
