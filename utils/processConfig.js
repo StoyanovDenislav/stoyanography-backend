@@ -28,11 +28,18 @@ async function processConfig(config) {
 
   const processPhotoCollections = async (collections) => {
     const processedCollections = {};
-    for (const [key, collection] of Object.entries(collections)) {
-      processedCollections[key] = {
-        tag: collection.tag,
-        photos: await processCollection(collection.photos),
-      };
+    for (const [locale, albums] of Object.entries(collections)) {
+      processedCollections[locale] = {};
+      for (const [albumName, album] of Object.entries(albums)) {
+        if (Array.isArray(album.photos)) {
+          processedCollections[locale][albumName] = {
+            tag: album.tag,
+            photos: await processCollection(album.photos),
+          };
+        } else {
+          console.error(`Photos for album ${albumName} are not an array`);
+        }
+      }
     }
     return processedCollections;
   };
