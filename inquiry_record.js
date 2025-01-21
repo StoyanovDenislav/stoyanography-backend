@@ -1,11 +1,40 @@
 const express = require("express");
+const crypto = require("crypto");
 const db_inquiries = require("./database_inquiry");
 const Nodemailer = require("./nodemailer");
-const createApplication = require("express/lib/express");
 const inquiry = express.Router();
 
 inquiry.use(express.json());
 require("dotenv").config();
+
+const algorithm = "aes-256-cbc";
+const secretKey = crypto
+  .createHash("sha256")
+  .update(String(process.env.SECRET_KEY))
+  .digest("base64")
+  .substr(0, 32);
+
+function encrypt(text) {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(algorithm, Buffer.from(secretKey), iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString("hex") + ":" + encrypted.toString("hex");
+}
+
+function decrypt(text) {
+  const textParts = text.split(":");
+  const iv = Buffer.from(textParts.shift(), "hex");
+  const encryptedText = Buffer.from(textParts.join(":"), "hex");
+  const decipher = crypto.createDecipheriv(
+    algorithm,
+    Buffer.from(secretKey),
+    iv
+  );
+  let decrypted = decipher.update(encryptedText);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString();
+}
 
 inquiry.post("/inquiry", async (req, res) => {
   const name = req.body.name;
@@ -26,39 +55,44 @@ inquiry.post("/inquiry", async (req, res) => {
     return res.status(400).send("Mining for Gold, found coal. Shame...");
   }
 
+  const encryptedName = encrypt(name);
+  const encryptedSurname = encrypt(surname);
+  const encryptedEmail = encrypt(email);
+  const encryptedPhoneNumber = encrypt(phone_number);
+  const encryptedMessage = encrypt(message);
+  const encryptedCategory = encrypt(category);
+
   const currInquiry = new Inquiry(
-    name,
-    surname,
-    email,
-    phone_number,
-    message,
-    category
+    encryptedName,
+    encryptedSurname,
+    encryptedEmail,
+    encryptedPhoneNumber,
+    encryptedMessage,
+    encryptedCategory
   );
 
   await currInquiry.registerInquiry().then(() => {
-    console.log("cool");
+    console.log("Inquiry registered successfully");
   });
 
-  console.log(message);
-
-  /**
-   * Very hacky solution
-   * Currently the requests will be sent directly via email,
-   * however we are also logging them into the DB, because
-   * once we do the admin page, we will need to fetch them from somewhere
-   */
+  const decryptedName = decrypt(encryptedName);
+  const decryptedSurname = decrypt(encryptedSurname);
+  const decryptedEmail = decrypt(encryptedEmail);
+  const decryptedPhoneNumber = decrypt(encryptedPhoneNumber);
+  const decryptedMessage = decrypt(encryptedMessage);
+  const decryptedCategory = decrypt(encryptedCategory);
 
   const mailer = new Nodemailer(
     "Stoyanography Support <support@stoyanography.com>",
     "Denislav Stoyanov <denislav.stoyanov@stoyanography.com>",
     "New Inquiry",
-    `Name: ${name}\n
-    Surname: ${surname}\n
-    Phone number: ${phone_number}\n
-    Category: ${category}\n
-    Email: ${email}\n
+    `Name: ${decryptedName}\n
+    Surname: ${decryptedSurname}\n
+    Phone number: ${decryptedPhoneNumber}\n
+    Category: ${decryptedCategory}\n
+    Email: ${decryptedEmail}\n
     -----------------------------------------------\n
-    ${message}
+    ${decryptedMessage}
     `
   );
 
@@ -99,15 +133,13 @@ class Inquiry {
         },
       };
 
-      await db_inquiries
-        .query(query, params)
-
-        .then(() => {
-          db_inquiries.close();
-        });
+      await db_inquiries.query(query, params).then(() => {
+        db_inquiries.close();
+      });
     } catch (error) {
-      console.error(`Error registering user: ${error.message}`);
+      console.error(`Error registering inquiry: ${error.message}`);
     }
   }
 }
+
 module.exports = inquiry;
