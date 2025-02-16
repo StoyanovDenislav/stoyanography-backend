@@ -16,7 +16,7 @@ async function handler(req, res) {
       res.status(404).send("No URL found for the provided path");
       return;
     }
-    res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=86400");
+
     res.status(200).send(photoUrl);
   } catch (error) {
     console.error(`Failed to fetch photo: ${path}`, error);
