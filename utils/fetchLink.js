@@ -25,7 +25,7 @@ async function fetchLink(path) {
 
   const headers = {
     Referer: referer,
-    // "Cache-Control": "public, max-age=3600",
+    "Cache-Control": "public, max-age=86400",
   };
 
   const response = await fetch(link, { headers });

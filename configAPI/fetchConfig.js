@@ -14,7 +14,7 @@ async function handler(req, res) {
   const processedConfig = await processConfig(configJSON);
 
   // Set caching headers
-  // res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+  res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=86400");
 
   res.status(200).json(processedConfig);
 }
