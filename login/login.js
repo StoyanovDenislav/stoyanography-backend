@@ -2,219 +2,270 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const speakeasy = require("speakeasy");
 const jwt = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
+const { body, validationResult } = require("express-validator");
 const db_admin = require("../database_inquiry");
 const cookieParser = require("cookie-parser");
-const { contentSecurityPolicy } = require("helmet");
 
-class User {
-  constructor(username) {
-    this.username = username;
+// Rate limiting middleware
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 requests per windowMs
+});
+
+class UserRepository {
+  static async findByUsername(username) {
+    try {
+      await db_admin.open();
+      const user = await db_admin.query(
+        "SELECT id, name, password FROM user WHERE name = :nm",
+        { params: { nm: username } }
+      );
+      return user[0] || null;
+    } finally {
+      await db_admin.close();
+    }
   }
 
-  async openDb() {
-    await db_admin.open();
-  }
-
-  async closeDb() {
-    await db_admin.close();
-  }
-
-  async getUser() {
-    await this.openDb();
-    const user = await db_admin.query(
-      "SELECT name FROM user WHERE name = :nm",
-      {
-        params: { nm: this.username },
-      }
-    );
-    await this.closeDb();
-    return user[0] ? true : false;
-  }
-
-  async getPassword() {
-    await this.openDb();
-    const pwd = await db_admin.query(
-      "SELECT password FROM user WHERE name = :us",
-      {
-        params: { us: this.username },
-      }
-    );
-    await this.closeDb();
-    return pwd[0] ? pwd[0].password : false;
-  }
-
-  async getId() {
-    await this.openDb();
-    const id = await db_admin.query("SELECT id FROM user WHERE name = :us", {
-      params: { us: this.username },
-    });
-    await this.closeDb();
-    return id[0] ? id[0].id : false;
+  static async updateRefreshToken(userId, token) {
+    try {
+      await db_admin.open();
+      const record = await db_admin
+        .select()
+        .from("user")
+        .where({ id: userId })
+        .one();
+      const recordID = record["@rid"];
+      const formattedID = `#${recordID.cluster}:${recordID.position}`;
+      await db_admin.update(formattedID).set({ refresh_token: token }).one();
+    } finally {
+      await db_admin.close();
+    }
   }
 }
 
 class AuthController {
-  static async getRefreshTokenByID(iD) {
-    await db_admin.open();
-    const userToken = await db_admin.query(
-      "SELECT refresh_token FROM user WHERE id = :id",
-      {
-        params: { id: iD },
-      }
-    );
-    await db_admin.close();
-    return userToken[0] ? userToken[0].refresh_token : false;
-  }
+  static #ACCESS_TOKEN_EXPIRY = "15m"; // Changed to 15 minutes
+  static #REFRESH_TOKEN_EXPIRY = "7d"; // Changed to 7 days
+  static COOKIE_OPTIONS = {
+    origin: "https://localhost:3000",
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    path: "/",
+  };
 
-  static async deleteRefreshTokenbyUserId(ID) {
+  static async handleLogin(req, res) {
     try {
-      await db_admin.open();
-      const smth = await db_admin
-        .select("*")
-        .from("user")
-        .where({ id: `${ID}` })
-        .one();
-      const recordID = smth["@rid"];
-      const formattedID = `#${recordID.cluster}:${recordID.position}`;
+      const { username, password } = req.body;
+      const user = await UserRepository.findByUsername(username);
 
-      await db_admin.update(formattedID).set({ refresh_token: null }).one();
-      await db_admin.close();
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      return res.sendStatus(204);
     } catch (error) {
-      console.error(error);
-      throw error;
+      console.error("Login error:", error);
+      return res.status(500).json({ message: "Internal server error" });
     }
   }
 
-  static authenticateToken(req, res, next) {
-    const tokenHeader = req.cookies.token;
-    if (tokenHeader == null) return res.sendStatus(401);
+  static async handle2FA(req, res) {
+    try {
+      const { username, code } = req.body;
+      const user = await UserRepository.findByUsername(username);
 
-    jwt.verify(tokenHeader, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
-      if (err) {
-        console.log(err);
-        return res.sendStatus(403);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
-      req.user = user;
-      next();
+
+      const codeMatch = speakeasy.totp.verify({
+        secret: process.env.AUTH_SECRET,
+        encoding: "ascii",
+        token: code,
+        window: 1,
+      });
+
+      if (!codeMatch) {
+        return res.status(401).json({ message: "Invalid 2FA code" });
+      }
+
+      const refreshToken = AuthController.generateRefreshToken(user.id);
+      await UserRepository.updateRefreshToken(user.id, refreshToken);
+
+      // Set both tokens in cookies
+      const accessToken = AuthController.generateAccessToken(user.id);
+      res.cookie("token", accessToken, {
+        ...AuthController.COOKIE_OPTIONS,
+        expires: new Date(Date.now() + 15 * 60 * 1000),
+      });
+
+      // Store userId in cookie for refresh token functionality
+      res.cookie("userId", user.id, {
+        ...AuthController.COOKIE_OPTIONS,
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      });
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error("2FA error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  static generateAccessToken(userId) {
+    return jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
+      expiresIn: this.#ACCESS_TOKEN_EXPIRY,
     });
   }
 
-  static generateAccessToken(user) {
-    return jwt.sign({ user: user }, process.env.ACCESS_TOKEN_SECRET, {
-      expiresIn: 120,
+  static generateRefreshToken(userId) {
+    return jwt.sign({ userId }, process.env.REFRESH_TOKEN_SECRET, {
+      expiresIn: this.#REFRESH_TOKEN_EXPIRY,
     });
   }
 
-  static generateRefreshToken(user) {
-    return jwt.sign({ user: user }, process.env.REFRESH_TOKEN_SECRET, {
-      expiresIn: 180,
-    });
+  static async authenticateToken(req, res, next) {
+    try {
+      const accessToken = req.cookies.token;
+      const userId = req.cookies.userId; // We'll store userId in a cookie
+
+      if (!accessToken || !userId) {
+        return res.sendStatus(401);
+      }
+
+      try {
+        // First try to verify the existing access token
+        const decoded = jwt.verify(
+          accessToken,
+          process.env.ACCESS_TOKEN_SECRET
+        );
+        req.user = decoded;
+        return next();
+      } catch (err) {
+        // If access token is expired, try to refresh it
+        if (err.name === "TokenExpiredError") {
+          try {
+            // Get user and verify refresh token
+            const user = await UserRepository.findByUsername(userId);
+
+            if (!user?.refresh_token) {
+              return res.sendStatus(401);
+            }
+
+            // Verify refresh token
+            jwt.verify(
+              user.refresh_token,
+              process.env.REFRESH_TOKEN_SECRET,
+              (refreshErr, decoded) => {
+                if (refreshErr) {
+                  // If refresh token is expired or invalid, user needs to login again
+                  return res
+                    .status(401)
+                    .json({ message: "Session expired. Please login again." });
+                }
+
+                // Generate new access token
+                const newAccessToken = AuthController.generateAccessToken(
+                  decoded.userId
+                );
+
+                // Set new access token in cookie
+                res.cookie("token", newAccessToken, {
+                  ...AuthController.COOKIE_OPTIONS,
+                  expires: new Date(Date.now() + 15 * 60 * 1000),
+                });
+
+                // Continue with request
+                req.user = decoded;
+                next();
+              }
+            );
+          } catch (error) {
+            console.error("Token refresh error:", error);
+            return res.status(500).json({ message: "Internal server error" });
+          }
+        } else {
+          return res.sendStatus(403);
+        }
+      }
+    } catch (error) {
+      console.error("Auth error:", error);
+      return res.sendStatus(403);
+    }
   }
 }
 
+// Router setup
 const login = express.Router();
 login.use(express.json());
 login.use(cookieParser());
-require("dotenv").config();
 
-login.post("/usernameID", async (req, res) => {
-  const username = req.body.username;
-  const user = new User(username);
-  const id = await user.getId();
-  res.json({ id: id });
+// Validation middleware
+const loginValidation = [
+  body("username").trim().isLength({ min: 3 }).escape(),
+  body("password").isLength({ min: 6 }),
+];
+
+const twoFAValidation = [
+  body("username").trim().isLength({ min: 3 }).escape(),
+  body("code").trim().isLength({ min: 6, max: 6 }).isNumeric(),
+];
+
+// Routes
+login.post("/login", loginValidation, loginLimiter, AuthController.handleLogin);
+login.post("/2fa", twoFAValidation, loginLimiter, AuthController.handle2FA);
+
+login.post("/logout", async (req, res) => {
+  try {
+    const { id } = req.body;
+    await UserRepository.updateRefreshToken(id, null);
+    res.clearCookie("token");
+    res.clearCookie("userId"); // Clear userId cookie on logout
+    res.sendStatus(204);
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 login.get("/token/:id", async (req, res) => {
-  let id = req.params.id;
-  const refreshToken = await AuthController.getRefreshTokenByID(id);
+  try {
+    const { id } = req.params;
+    const user = await UserRepository.findByUsername(id);
 
-  await jwt.verify(
-    refreshToken,
-    process.env.REFRESH_TOKEN_SECRET,
-    (err, user) => {
-      if (err) {
-        return res.sendStatus(403);
-      }
-      const accessToken = AuthController.generateAccessToken(user);
-      res.cookie("token", accessToken, {
-        origin: "https://localhost:3000",
-        expires: new Date(Date.now() + 15 * 60 * 1000), // set desired expiration here
-        httpOnly: true,
-        path: "/",
-        secure: true,
-        sameSite: "none",
-      });
-      return res.sendStatus(204);
+    if (!user?.refresh_token) {
+      return res.sendStatus(401);
     }
-  );
+
+    jwt.verify(
+      user.refresh_token,
+      process.env.REFRESH_TOKEN_SECRET,
+      (err, decoded) => {
+        if (err) return res.sendStatus(403);
+
+        const accessToken = AuthController.generateAccessToken(decoded.userId);
+        res.cookie("token", accessToken, {
+          ...AuthController.COOKIE_OPTIONS,
+          expires: new Date(Date.now() + 15 * 60 * 1000),
+        });
+        res.sendStatus(204);
+      }
+    );
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
-login.post("/login", async (req, res) => {
-  const username = req.body.username;
-  const password = req.body.password;
-  const user = new User(username);
-
-  const userExists = await user.getUser();
-  if (!userExists) {
-    return res.status(404).json({ message: "User not found" });
-  }
-
-  const passwordMatch = await bcrypt.compare(
-    password,
-    await user.getPassword()
-  );
-  if (!passwordMatch) {
-    return res.status(401).json({ message: "Incorrect password" });
-  }
-
-  res.sendStatus(204);
+login.get("/requestName", AuthController.authenticateToken, (req, res) => {
+  res.json({ name: "DesoBeso" });
 });
-
-login.post("/2fa", async (req, res) => {
-  const username = req.body.username;
-  const enteredCode = req.body.code;
-  const user = new User(username);
-
-  const codeMatch = speakeasy.totp.verify({
-    secret: process.env.AUTH_SECRET,
-    encoding: "ascii",
-    token: enteredCode,
-  });
-  if (!codeMatch) {
-    return res.status(401).json({ message: "Incorrect 2FA code" });
-  }
-
-  const refreshToken = AuthController.generateRefreshToken({
-    id: await user.getId(),
-  });
-  await db_admin.open();
-  const record = await db_admin
-    .select()
-    .from("user")
-    .where({ name: username })
-    .one();
-  const recordID = record["@rid"];
-  const formattedID = `#${recordID.cluster}:${recordID.position}`;
-
-  await db_admin.update(formattedID).set({ refresh_token: refreshToken }).one();
-  await db_admin.close();
-  res.sendStatus(204);
-});
-
-login.post("/logout", async (req, res) => {
-  const usernameID = req.body.id;
-  await AuthController.deleteRefreshTokenbyUserId(usernameID).then(() => {
-    res.clearCookie("token");
-    res.end();
-  });
-});
-
-login.get(
-  "/requestName",
-  AuthController.authenticateToken,
-  async (req, res) => {
-    res.json({ name: "DesoBeso" });
-  }
-);
 
 module.exports = login;
