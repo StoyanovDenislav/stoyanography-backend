@@ -44,8 +44,8 @@ inquiry.post("/inquiry", async (req, res) => {
   const message = req.body.message;
   const category = req.body.category;
 
-  // Input validation
-  if (!/^[a-zA-Z\s]+$/.test(name) || !/^[a-zA-Z\s]+$/.test(surname)) {
+  // Updated input validation to accept Cyrillic
+  if (!/^[\p{L}\s]+$/u.test(name) || !/^[\p{L}\s]+$/u.test(surname)) {
     return res.status(400).send("Mining for Gold, found coal. Shame...");
   }
   if (!/^[a-zA-Z0-9_\-\.]+@(?:[a-zA-Z0-9]+\.)+[a-zA-Z]+$/.test(email)) {
