@@ -197,16 +197,42 @@ app.use(
 );
 app.use(apiRouter);
 
-const options = {
-  key: fs.readFileSync("./certs/privkey.pem"),
-  cert: fs.readFileSync("./certs/fullchain.pem"), //once on the server, make sure to reroute the ssl certs
-  //to the folder that holds the real SSL certs
-};
-const server = https.createServer(options, app);
-
+const isDev = process.env.NODE_ENV !== "production";
 const port = 6001;
-server.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
 
-  //set HTTPS=true&&
+let server;
+
+if (isDev) {
+  // Use HTTP for development
+  console.log("Starting server in DEVELOPMENT mode (HTTP)");
+  server = require("http").createServer(app);
+} else {
+  // Use HTTPS for production
+  console.log("Starting server in PRODUCTION mode (HTTPS)");
+  try {
+    const options = {
+      key: fs.readFileSync("./certs/privkey.pem"),
+      cert: fs.readFileSync("./certs/fullchain.pem"),
+    };
+    server = require("https").createServer(options, app);
+  } catch (error) {
+    console.error("Error loading SSL certificates:", error);
+    process.exit(1);
+  }
+}
+
+server.listen(port, () => {
+  console.log(
+    `Server is running on port ${port} in ${
+      isDev ? "development" : "production"
+    } mode`
+  );
+});
+
+// Graceful shutdown handler
+process.on("SIGTERM", () => {
+  server.close(() => {
+    console.log("Server gracefully terminated");
+    process.exit(0);
+  });
 });
