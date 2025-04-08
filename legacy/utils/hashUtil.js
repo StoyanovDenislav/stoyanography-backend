@@ -25,9 +25,20 @@ function generateBase64Hash({ secret, path, expiry, ref }) {
 
 function generateLink({ secret, path, expiry, ref }) {
   const hash = generateBase64Hash({ secret, path, expiry, ref });
-  const baseUrl = `https://cdn.stoyanography.com${path}?md5=${hash}&expires=${expiry}&ref=${ref}`;
 
-  return baseUrl;
+  // Fix: Check if path already includes protocol and domain
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    // Get just the pathname from the URL to avoid double domains
+    try {
+      const url = new URL(path);
+      return `${url.origin}${url.pathname}?md5=${hash}&expires=${expiry}&ref=${ref}`;
+    } catch (e) {
+      console.error("Invalid URL format:", path);
+    }
+  }
+
+  // Regular path case (starts with /)
+  return `https://cdn.stoyanography.com${path}?md5=${hash}&expires=${expiry}&ref=${ref}`;
 }
 
 module.exports = {
