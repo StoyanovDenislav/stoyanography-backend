@@ -26,8 +26,21 @@ async function fetchImageHandler(req, res) {
       return;
     }
 
-    // Set caching headers for optimization
-    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+    // Set caching headers based on environment
+    const isDev = process.env.NODE_ENV === "development";
+    if (isDev) {
+      // No caching in development mode
+      res.setHeader(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, proxy-revalidate"
+      );
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    } else {
+      // Cache for 24 hours in production
+      res.setHeader("Cache-Control", "public, max-age=86400");
+    }
+
     res.status(200).json({ url: photoUrl });
   } catch (error) {
     // Detailed error logging with full context

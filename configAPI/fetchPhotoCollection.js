@@ -43,7 +43,10 @@ async function fetchPhotoCollectionHandler(req, res) {
           processedPhotos.push(photoUrl);
         }
       } catch (error) {
-        console.error(`Failed to fetch photo (photo collection): ${photoPath}`, error);
+        console.error(
+          `Failed to fetch photo (photo collection): ${photoPath}`,
+          error
+        );
       }
     }
 
@@ -53,7 +56,21 @@ async function fetchPhotoCollectionHandler(req, res) {
       photos: processedPhotos,
     };
 
-    res.setHeader("Cache-Control", "public, max-age=3600");
+    // Set caching headers based on environment
+    const isDev = process.env.NODE_ENV === "development";
+    if (isDev) {
+      // No caching in development mode
+      res.setHeader(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, proxy-revalidate"
+      );
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    } else {
+      // Cache for 1 hour in production
+      res.setHeader("Cache-Control", "public, max-age=3600");
+    }
+
     res.status(200).json(result);
   } catch (error) {
     console.error(

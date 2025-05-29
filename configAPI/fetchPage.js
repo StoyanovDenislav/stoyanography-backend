@@ -31,7 +31,21 @@ async function fetchPageHandler(req, res) {
       const processedConfig = await processNewConfig(configJSON);
       const result = processedConfig.Pages.services[serviceName];
 
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      // Set caching headers based on environment
+      const isDev = process.env.NODE_ENV === "development";
+      if (isDev) {
+        // No caching in development mode
+        res.setHeader(
+          "Cache-Control",
+          "no-store, no-cache, must-revalidate, proxy-revalidate"
+        );
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      } else {
+        // Cache for 1 hour in production
+        res.setHeader("Cache-Control", "public, max-age=3600");
+      }
+
       res.status(200).json(result);
       return;
     }
@@ -46,7 +60,21 @@ async function fetchPageHandler(req, res) {
     const processedConfig = await processNewConfig(configJSON);
     const result = processedConfig.Pages[pageName];
 
-    res.setHeader("Cache-Control", "public, max-age=3600");
+    // Set caching headers based on environment
+    const isDev = process.env.NODE_ENV === "development";
+    if (isDev) {
+      // No caching in development mode
+      res.setHeader(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, proxy-revalidate"
+      );
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    } else {
+      // Cache for 1 hour in production
+      res.setHeader("Cache-Control", "public, max-age=3600");
+    }
+
     res.status(200).json(result);
   } catch (error) {
     console.error(`Failed to fetch or process page: ${error.message}`);
