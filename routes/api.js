@@ -15,8 +15,8 @@ const {
 const router = express.Router();
 
 // Legacy endpoints
-router.get("/fetchLegacyConfig", fetchLegacyConfigHandler);
-router.get("/fetchLegacyImage", fetchLegacyImageHandler);
+//router.get("/fetchLegacyConfig", fetchLegacyConfigHandler);
+//router.get("/fetchLegacyImage", fetchLegacyImageHandler);
 
 // New endpoints
 router.get("/fetchConfig", fetchConfigHandler);

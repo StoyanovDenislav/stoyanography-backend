@@ -3,8 +3,10 @@ const fetchLink = require("../legacy/utils/fetchLink");
 async function processNewConfig(config) {
   const processedConfig = {
     ...config,
+    maintainance_mode: config.maintainance_mode,
     SingularImages: config.SingularImages ? {} : undefined,
     PhotoCollections: config.PhotoCollections ? {} : undefined,
+    banners: config.banners ? [...config.banners] : undefined,
     Pages: config.Pages ? { ...config.Pages } : undefined,
   };
 
@@ -57,22 +59,18 @@ async function processNewConfig(config) {
   const processPhotoCollections = async (collections) => {
     const processedCollections = {};
 
-    for (const [category, albums] of Object.entries(collections)) {
-      processedCollections[category] = {};
-
-      for (const [albumName, album] of Object.entries(albums)) {
-        if (Array.isArray(album.photos)) {
-          processedCollections[category][albumName] = {
-            tag: album.tag,
-            photos: await processPhotoCollection(album.photos),
-          };
-        } else {
-          console.error(`Photos for album ${albumName} are not an array`);
-          processedCollections[category][albumName] = {
-            tag: album.tag,
-            photos: [],
-          };
-        }
+    for (const [albumName, album] of Object.entries(collections)) {
+      if (Array.isArray(album.photos)) {
+        processedCollections[albumName] = {
+          translations: album.translations,
+          photos: await processPhotoCollection(album.photos),
+        };
+      } else {
+        console.error(`Photos for album ${albumName} are not an array`);
+        processedCollections[albumName] = {
+          translations: album.translations,
+          photos: [],
+        };
       }
     }
 
@@ -116,6 +114,33 @@ async function processNewConfig(config) {
       } else {
         // Regular pages (non-services)
         processedPages[pageName] = { ...page };
+
+        // Process serviceItems for servicesOverview page
+        if (pageName === "servicesOverview" && page.serviceItems) {
+          processedPages[pageName].serviceItems = [];
+          for (const item of page.serviceItems) {
+            const processedItem = { ...item };
+            if (item.imageUrl) {
+              try {
+                const fetchedPhoto = await fetchLink(item.imageUrl);
+                const photoUrl = fetchedPhoto.url;
+                if (photoUrl) {
+                  processedItem.imageUrl = photoUrl;
+                } else {
+                  console.error(
+                    `No URL found for serviceItem image: ${item.imageUrl}`
+                  );
+                }
+              } catch (error) {
+                console.error(
+                  `Failed to fetch serviceItem image: ${item.imageUrl}`,
+                  error
+                );
+              }
+            }
+            processedPages[pageName].serviceItems.push(processedItem);
+          }
+        }
 
         if (!page.sections) continue;
 
