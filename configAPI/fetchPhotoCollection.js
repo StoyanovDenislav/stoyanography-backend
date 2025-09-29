@@ -1,4 +1,4 @@
-const fetchLink = require("../legacy/utils/fetchLink");
+const cacheManager = require("../utils/CacheManager");
 
 async function fetchPhotoCollectionHandler(req, res) {
   const { path, category, name } = req.query;
@@ -19,42 +19,12 @@ async function fetchPhotoCollectionHandler(req, res) {
   }
 
   try {
-    const response = await fetchLink(path);
-    const configJSON = await response.json();
-
-    if (
-      !configJSON.PhotoCollections ||
-      !configJSON.PhotoCollections[category] ||
-      !configJSON.PhotoCollections[category][name]
-    ) {
-      res.status(404).json({ error: "Photo collection not found" });
-      return;
-    }
-
-    // Process only this specific collection
-    const collection = configJSON.PhotoCollections[category][name];
-    const processedPhotos = [];
-
-    for (const photoPath of collection.photos) {
-      try {
-        const fetchedPhoto = await fetchLink(photoPath);
-        const photoUrl = fetchedPhoto.url;
-        if (photoUrl) {
-          processedPhotos.push(photoUrl);
-        }
-      } catch (error) {
-        console.error(
-          `Failed to fetch photo (photo collection): ${photoPath}`,
-          error
-        );
-      }
-    }
-
-    // Return the processed collection
-    const result = {
-      tag: collection.tag,
-      photos: processedPhotos,
-    };
+    // Use cache manager for threaded processing and caching
+    const result = await cacheManager.getCachedPhotoCollection(
+      path,
+      category,
+      name
+    );
 
     // Set caching headers based on environment
     const isDev = process.env.NODE_ENV === "development";
@@ -67,8 +37,8 @@ async function fetchPhotoCollectionHandler(req, res) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
     } else {
-      // Cache for 1 hour in production
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      // Cache for 6 hours in production (collections change less frequently)
+      res.setHeader("Cache-Control", "public, max-age=21600");
     }
 
     res.status(200).json(result);

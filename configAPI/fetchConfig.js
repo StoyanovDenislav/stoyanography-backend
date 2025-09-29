@@ -1,5 +1,4 @@
-const fetchLink = require("../legacy/utils/fetchLink");
-const processNewConfig = require("../utils/processNewConfig");
+const cacheManager = require("../utils/CacheManager");
 
 async function fetchConfigHandler(req, res) {
   const { path } = req.query;
@@ -10,9 +9,8 @@ async function fetchConfigHandler(req, res) {
   }
 
   try {
-    const response = await fetchLink(path);
-    const configJSON = await response.json();
-    const processedConfig = await processNewConfig(configJSON);
+    // Use cache manager for threaded processing and caching
+    const processedConfig = await cacheManager.getCachedConfig(path);
 
     // Set caching headers based on environment
     const isDev = process.env.NODE_ENV === "development";
@@ -25,7 +23,7 @@ async function fetchConfigHandler(req, res) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
     } else {
-      // Cache for 1 hour in production
+      // Cache for 1 hour in production (server-side cache handles the heavy lifting)
       res.setHeader("Cache-Control", "public, max-age=3600");
     }
 

@@ -1,4 +1,4 @@
-const fetchLink = require("../legacy/utils/fetchLink");
+const cacheManager = require("../utils/CacheManager");
 
 async function fetchImageHandler(req, res) {
   const { path } = req.query;
@@ -12,19 +12,8 @@ async function fetchImageHandler(req, res) {
   console.log(`fetchImageHandler received path: ${path}`);
 
   try {
-    // Ensure path doesn't have duplicate protocol/domain
-    const cleanPath = path.startsWith("http") ? new URL(path).pathname : path;
-
-    console.log(`Using cleaned path: ${cleanPath}`);
-
-    const fetchedPhoto = await fetchLink(cleanPath);
-    const photoUrl = fetchedPhoto.url;
-
-    if (!photoUrl) {
-      console.error(`No URL returned for path: ${cleanPath}`);
-      res.status(404).json({ error: "No URL found for the provided path" });
-      return;
-    }
+    // Use cache manager for caching
+    const result = await cacheManager.getCachedImage(path);
 
     // Set caching headers based on environment
     const isDev = process.env.NODE_ENV === "development";
@@ -37,11 +26,11 @@ async function fetchImageHandler(req, res) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
     } else {
-      // Cache for 24 hours in production
+      // Cache for 24 hours in production (images rarely change)
       res.setHeader("Cache-Control", "public, max-age=86400");
     }
 
-    res.status(200).json({ url: photoUrl });
+    res.status(200).json(result);
   } catch (error) {
     // Detailed error logging with full context
     console.error(`Failed to fetch photo: ${path}`);

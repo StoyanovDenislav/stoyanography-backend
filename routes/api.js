@@ -1,10 +1,6 @@
 const express = require("express");
 
-// Legacy handlers
-const fetchLegacyConfigHandler = require("../legacy/configAPI/fetchConfig");
-const fetchLegacyImageHandler = require("../legacy/configAPI/fetchImage");
-
-// New handlers
+// API handlers
 const {
   fetchConfigHandler,
   fetchImageHandler,
@@ -14,11 +10,7 @@ const {
 
 const router = express.Router();
 
-// Legacy endpoints
-//router.get("/fetchLegacyConfig", fetchLegacyConfigHandler);
-//router.get("/fetchLegacyImage", fetchLegacyImageHandler);
-
-// New endpoints
+// API endpoints
 router.get("/fetchConfig", fetchConfigHandler);
 router.get("/fetchImage", fetchImageHandler);
 router.get("/fetchPhotoCollection", fetchPhotoCollectionHandler);

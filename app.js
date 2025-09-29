@@ -11,6 +11,8 @@ const https = require("https");
 const fs = require("fs");
 const SendTestEmail = require("./nodemailer.js");
 const apiRouter = require("./routes/api.js");
+const adminRouter = require("./routes/admin.js");
+const cacheManager = require("./utils/CacheManager");
 //const db = require("./database")
 
 require("dotenv").config();
@@ -196,6 +198,50 @@ app.use(
   })
 );
 app.use(apiRouter);
+app.use("/admin", adminRouter);
+
+// Startup config processing function
+async function preProcessConfigs() {
+  console.log("🚀 Starting automatic config pre-processing...");
+
+  // Common config paths that are frequently requested
+  const commonConfigPaths = [
+    "/upload/configs/main/config.json",
+    "/upload/configs/configCMS.json",
+
+    // Add more paths based on your typical usage
+  ];
+
+  // You can also define this in environment variables
+  const envConfigPaths = process.env.STARTUP_CONFIG_PATHS;
+  if (envConfigPaths) {
+    const additionalPaths = envConfigPaths
+      .split(",")
+      .map((path) => path.trim());
+    commonConfigPaths.push(...additionalPaths);
+  }
+
+  const processingPromises = commonConfigPaths.map(async (configPath) => {
+    try {
+      console.log(`🔄 Pre-processing config: ${configPath}`);
+      await cacheManager.getCachedConfig(configPath);
+      console.log(`✅ Pre-processed config: ${configPath}`);
+    } catch (error) {
+      console.log(
+        `⚠️ Could not pre-process config ${configPath}:`,
+        error.message
+      );
+      // Don't throw - just log and continue with other configs
+    }
+  });
+
+  try {
+    await Promise.allSettled(processingPromises);
+    console.log("🎉 Startup config pre-processing completed");
+  } catch (error) {
+    console.error("❌ Error during startup config processing:", error);
+  }
+}
 
 const isDev = process.env.NODE_ENV !== "production";
 const port = 6001;
@@ -221,12 +267,19 @@ if (isDev) {
   }
 }
 
-server.listen(port, () => {
+server.listen(port, async () => {
   console.log(
     `Server is running on port ${port} in ${
       isDev ? "development" : "production"
     } mode`
   );
+
+  // Start config pre-processing in the background after server is ready
+  setTimeout(() => {
+    preProcessConfigs().catch((error) => {
+      console.error("Startup config processing failed:", error);
+    });
+  }, 1000); // Give the server a second to fully initialize
 });
 
 // Graceful shutdown handler
