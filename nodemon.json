@@ -1,0 +1,4 @@
+{
+  "ignore": ["cache/*", "cache/**/*", "node_modules/*", "*.log", "*.tmp"],
+  "ext": "js,json"
+}

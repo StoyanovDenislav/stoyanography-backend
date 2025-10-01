@@ -1,6 +1,7 @@
 const ServerCache = require("./ServerCache");
 const processNewConfig = require("./processNewConfig");
 const fetchLink = require("../legacy/utils/fetchLink");
+const crypto = require("crypto");
 
 class CacheManager {
   constructor() {
@@ -12,27 +13,71 @@ class CacheManager {
 
     // Track ongoing processing to prevent concurrent processing of same items
     this.processingLocks = new Map();
+    
+    // Track config hashes to detect changes
+    this.configHashes = new Map();
+    
+    // Hourly check interval
+    this.hourlyCheckInterval = null;
+    
+    // WebSocket clients for real-time notifications
+    this.wsClients = new Set();
 
     console.log("🚀 CacheManager initialized - On-demand caching enabled");
   }
-
-  // Generate cache keys for different data types
+  
+  // WebSocket client management
+  addWSClient(ws) {
+    this.wsClients.add(ws);
+    console.log(`📡 WebSocket client connected. Total: ${this.wsClients.size}`);
+    
+    ws.on('close', () => {
+      this.wsClients.delete(ws);
+      console.log(`📡 WebSocket client disconnected. Total: ${this.wsClients.size}`);
+    });
+  }
+  
+  broadcastConfigChange(configPath) {
+    const message = JSON.stringify({
+      type: 'CONFIG_CHANGED',
+      configPath: configPath,
+      timestamp: new Date().toISOString(),
+      action: 'CLEAR_LOCALSTORAGE'
+    });
+    
+    this.wsClients.forEach(ws => {
+      if (ws.readyState === 1) { // WebSocket.OPEN
+        try {
+          ws.send(message);
+          console.log(`📡 Sent localStorage clear notification for ${configPath}`);
+        } catch (error) {
+          console.error('Failed to send WebSocket message:', error);
+          this.wsClients.delete(ws);
+        }
+      }
+    });
+  }
+  
+  // Get current config hash for version headers
+  getCurrentConfigHash(configPath) {
+    return this.configHashes.get(configPath) || 'unknown';
+  }  // Generate cache keys for different data types
   generateConfigKey(path) {
-    return `config:${path}`;
+    return `${path}`;
   }
 
   generatePageKey(path, pageName, serviceName = null) {
     return serviceName
-      ? `page:${path}:${pageName}:${serviceName}`
-      : `page:${path}:${pageName}`;
+      ? `${path}:${pageName}:${serviceName}`
+      : `${path}:${pageName}`;
   }
 
   generateCollectionKey(path, category, name) {
-    return `collection:${path}:${category}:${name}`;
+    return `${path}:${category}:${name}`;
   }
 
   generateImageKey(path) {
-    return `image:${path}`;
+    return `${path}`;
   }
 
   // Cached config fetching with threaded processing
@@ -344,6 +389,129 @@ class CacheManager {
       console.log(`🔥 Cache warming completed for: ${configPath}`);
     } catch (error) {
       console.error(`Cache warming failed for ${configPath}:`, error);
+    }
+  }
+
+  // Hash-based change detection methods
+  async getConfigHash(configPath) {
+    try {
+      const response = await fetchLink(configPath);
+      const configContent = await response.text();
+      return crypto.createHash("sha256").update(configContent).digest("hex");
+    } catch (error) {
+      console.error(`Failed to fetch config for hashing ${configPath}:`, error);
+      return null;
+    }
+  }
+
+  async hasConfigChanged(configPath) {
+    const currentHash = await this.getConfigHash(configPath);
+    if (!currentHash) return false; // If we can't fetch, assume no change
+
+    const previousHash = this.configHashes.get(configPath);
+    const hasChanged = !previousHash || previousHash !== currentHash;
+
+    if (hasChanged) {
+      console.log(`🔄 Config changed detected: ${configPath}`);
+      this.configHashes.set(configPath, currentHash);
+      
+      // Broadcast localStorage clear notification to all connected clients
+      this.broadcastConfigChange(configPath);
+    } else {
+      console.log(`✅ No changes in config: ${configPath}`);
+    }
+
+    return hasChanged;
+  }
+
+  async checkAndUpdateConfig(configPath) {
+    try {
+      const hasChanged = await this.hasConfigChanged(configPath);
+
+      if (hasChanged) {
+        console.log(`🔄 Processing updated config: ${configPath}`);
+
+        // Force cache invalidation by deleting the old cache
+        const cacheKey = this.generateConfigKey(configPath);
+        await this.cache.delete(cacheKey);
+
+        // Process the new config
+        await this.getCachedConfig(configPath);
+
+        console.log(`✅ Updated config processed: ${configPath}`);
+        return true;
+      } else {
+        console.log(`⏭️ Skipping unchanged config: ${configPath}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`Failed to check/update config ${configPath}:`, error);
+      return false;
+    }
+  }
+
+  async checkAllConfigs(configPaths) {
+    console.log("🔍 Starting config change detection...");
+
+    const checkPromises = configPaths.map(async (configPath) => {
+      try {
+        const updated = await this.checkAndUpdateConfig(configPath);
+        return { configPath, updated, success: true };
+      } catch (error) {
+        console.error(`Failed to check config ${configPath}:`, error);
+        return {
+          configPath,
+          updated: false,
+          success: false,
+          error: error.message,
+        };
+      }
+    });
+
+    const results = await Promise.allSettled(checkPromises);
+
+    const summary = results.map((result) =>
+      result.status === "fulfilled"
+        ? result.value
+        : {
+            configPath: "unknown",
+            updated: false,
+            success: false,
+            error: result.reason?.message || "Unknown error",
+          }
+    );
+
+    const updatedCount = summary.filter((r) => r.updated).length;
+    const failedCount = summary.filter((r) => !r.success).length;
+
+    console.log(
+      `🎉 Config check completed: ${updatedCount} updated, ${failedCount} failed, ${
+        summary.length - updatedCount - failedCount
+      } unchanged`
+    );
+
+    return summary;
+  }
+
+  startHourlyConfigCheck(configPaths) {
+    if (this.hourlyCheckInterval) {
+      clearInterval(this.hourlyCheckInterval);
+    }
+
+    // Check every hour (3600000 ms)
+    this.hourlyCheckInterval = setInterval(async () => {
+      console.log("⏰ Hourly config check starting...");
+      await this.checkAllConfigs(configPaths);
+    }, 3600000);
+
+    console.log("⏰ Hourly config monitoring started");
+  }
+
+  stopHourlyConfigCheck() {
+    if (this.hourlyCheckInterval) {
+      clearInterval(this.hourlyCheckInterval);
+      this.hourlyCheckInterval = null;
+      console.log("⏰ Hourly config monitoring stopped");
     }
   }
 }

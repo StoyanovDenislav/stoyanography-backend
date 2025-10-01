@@ -13,6 +13,7 @@ const SendTestEmail = require("./nodemailer.js");
 const apiRouter = require("./routes/api.js");
 const adminRouter = require("./routes/admin.js");
 const cacheManager = require("./utils/CacheManager");
+const fetchLink = require("./legacy/utils/fetchLink");
 //const db = require("./database")
 
 require("dotenv").config();
@@ -202,47 +203,63 @@ app.use("/admin", adminRouter);
 
 // Startup config processing function
 async function preProcessConfigs() {
-  console.log("🚀 Starting automatic config pre-processing...");
+  console.log(
+    "🚀 Starting automatic config processing with change detection..."
+  );
 
-  // Common config paths that are frequently requested
-  const commonConfigPaths = [
-    "/upload/configs/main/config.json",
-    "/upload/configs/configCMS.json",
+  // Get config paths from environment variable or use a sensible default
+  let configPaths = [];
 
-    // Add more paths based on your typical usage
-  ];
-
-  // You can also define this in environment variables
   const envConfigPaths = process.env.STARTUP_CONFIG_PATHS;
   if (envConfigPaths) {
-    const additionalPaths = envConfigPaths
-      .split(",")
-      .map((path) => path.trim());
-    commonConfigPaths.push(...additionalPaths);
-  }
+    configPaths = envConfigPaths.split(",").map((path) => path.trim());
+    console.log(
+      `📋 Using config paths from environment: ${configPaths.join(", ")}`
+    );
+  } else {
+    // Default to common paths, but we'll verify they exist
+    const potentialPaths = [
+      "/upload/configs/main/config.json",
+      "/upload/configs/configCMS.json",
+    ];
 
-  const processingPromises = commonConfigPaths.map(async (configPath) => {
-    try {
-      console.log(`🔄 Pre-processing config: ${configPath}`);
-      await cacheManager.getCachedConfig(configPath);
-      console.log(`✅ Pre-processed config: ${configPath}`);
-    } catch (error) {
-      console.log(
-        `⚠️ Could not pre-process config ${configPath}:`,
-        error.message
-      );
-      // Don't throw - just log and continue with other configs
+    // Test which configs actually exist by trying to fetch them
+    console.log("🔍 Testing which config paths are accessible...");
+    for (const path of potentialPaths) {
+      try {
+        const response = await fetchLink(path);
+        if (response.ok) {
+          configPaths.push(path);
+          console.log(`✅ Config found: ${path}`);
+        }
+      } catch (error) {
+        console.log(`❌ Config not accessible: ${path} (${error.message})`);
+      }
     }
-  });
-
-  try {
-    await Promise.allSettled(processingPromises);
-    console.log("🎉 Startup config pre-processing completed");
-  } catch (error) {
-    console.error("❌ Error during startup config processing:", error);
   }
-}
 
+  if (configPaths.length === 0) {
+    console.log(
+      "⚠️ No accessible config paths found. Skipping automatic processing."
+    );
+    console.log(
+      "💡 Set STARTUP_CONFIG_PATHS environment variable to specify config paths to monitor."
+    );
+    return;
+  }
+
+  console.log(
+    `📝 Monitoring ${configPaths.length} config(s): ${configPaths.join(", ")}`
+  );
+
+  // Use hash-based change detection instead of processing everything
+  await cacheManager.checkAllConfigs(configPaths);
+
+  // Start hourly monitoring
+  cacheManager.startHourlyConfigCheck(configPaths);
+
+  console.log("🎉 Startup config processing and monitoring setup completed");
+}
 const isDev = process.env.NODE_ENV !== "production";
 const port = 6001;
 
@@ -284,6 +301,17 @@ server.listen(port, async () => {
 
 // Graceful shutdown handler
 process.on("SIGTERM", () => {
+  console.log("Received SIGTERM, shutting down gracefully...");
+  cacheManager.stopHourlyConfigCheck();
+  server.close(() => {
+    console.log("Server gracefully terminated");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", () => {
+  console.log("Received SIGINT, shutting down gracefully...");
+  cacheManager.stopHourlyConfigCheck();
   server.close(() => {
     console.log("Server gracefully terminated");
     process.exit(0);

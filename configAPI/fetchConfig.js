@@ -12,6 +12,10 @@ async function fetchConfigHandler(req, res) {
     // Use cache manager for threaded processing and caching
     const processedConfig = await cacheManager.getCachedConfig(path);
 
+    // Add config version header for frontend cache invalidation
+    const configVersion = cacheManager.getCurrentConfigHash(path);
+    res.setHeader("X-Config-Version", configVersion);
+
     // Set caching headers based on environment
     const isDev = process.env.NODE_ENV === "development";
     if (isDev) {
