@@ -22,8 +22,12 @@ const CONFIG_CMS_PATH = path.join(
  * Process a photo collection - store metadata only, no image conversion
  */
 async function processPhotoCollection(collectionName, collectionData) {
-  console.log(`  📸 Processing collection: ${collectionName} (${collectionData.photos?.length || 0} images)`);
-  
+  console.log(
+    `  📸 Processing collection: ${collectionName} (${
+      collectionData.photos?.length || 0
+    } images)`
+  );
+
   return {
     collectionName,
     photos: [], // Empty array - will be populated by image migration script
@@ -123,7 +127,9 @@ async function migrateConfig() {
 
     const singularImages = configCMS.SingularImages || {};
 
-    await db.query(`DELETE VERTEX CMSConfig WHERE configKey = 'SingularImages'`);
+    await db.query(
+      `DELETE VERTEX CMSConfig WHERE configKey = 'SingularImages'`
+    );
     await db.query(
       `INSERT INTO CMSConfig SET 
         configKey = 'SingularImages',
@@ -138,7 +144,9 @@ async function migrateConfig() {
       }
     );
 
-    console.log(`✅ Migrated ${Object.keys(singularImages).length} singular images\n`);
+    console.log(
+      `✅ Migrated ${Object.keys(singularImages).length} singular images\n`
+    );
 
     // ========================================
     // 5. Migrate Banners
@@ -272,13 +280,19 @@ async function migrateConfig() {
     console.log("==================================================");
     console.log("🎉 Config Migration completed successfully!\n");
     console.log("📊 Summary:");
-    console.log(`   - Photo Collections: ${collectionNames.length} (metadata only)`);
-    console.log(`   - Singular Images: ${Object.keys(singularImages).length} (paths only)`);
+    console.log(
+      `   - Photo Collections: ${collectionNames.length} (metadata only)`
+    );
+    console.log(
+      `   - Singular Images: ${Object.keys(singularImages).length} (paths only)`
+    );
     console.log(`   - Banners: ${banners.length}`);
     console.log(`   - Page Configurations: ${pageCount}`);
     console.log(`   - Other Settings: 1 (maintenance mode)`);
     console.log("\n💡 Next steps:");
-    console.log("   1. Run 'node database/migrate-cms-images.js' to populate images");
+    console.log(
+      "   1. Run 'node database/migrate-cms-images.js' to populate images"
+    );
     console.log("   2. Test the API endpoints");
     console.log("   3. Update frontend to use API instead of JSON files");
   } catch (error) {

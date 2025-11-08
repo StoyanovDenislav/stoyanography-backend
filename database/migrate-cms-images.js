@@ -20,45 +20,48 @@ const IMAGE_ORIGIN = "https://stoyanography.com";
 async function downloadImageAsBase64(url) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith("https://") ? https : http;
-    
+
     const options = {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://stoyanography.com'
-      }
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Referer: "https://stoyanography.com",
+      },
     };
-    
+
     const timeout = setTimeout(() => {
-      reject(new Error('Request timeout'));
+      reject(new Error("Request timeout"));
     }, 15000); // 15 second timeout
-    
-    client.get(url, options, (response) => {
-      clearTimeout(timeout);
-      
-      // Handle redirects
-      if (response.statusCode === 301 || response.statusCode === 302) {
-        return downloadImageAsBase64(response.headers.location)
-          .then(resolve)
-          .catch(reject);
-      }
 
-      if (response.statusCode !== 200) {
-        reject(new Error(`HTTP ${response.statusCode}`));
-        return;
-      }
+    client
+      .get(url, options, (response) => {
+        clearTimeout(timeout);
 
-      const chunks = [];
-      response.on("data", (chunk) => chunks.push(chunk));
-      response.on("end", () => {
-        const buffer = Buffer.concat(chunks);
-        const base64 = buffer.toString("base64");
-        const contentType = response.headers["content-type"] || "image/jpeg";
-        resolve(`data:${contentType};base64,${base64}`);
+        // Handle redirects
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          return downloadImageAsBase64(response.headers.location)
+            .then(resolve)
+            .catch(reject);
+        }
+
+        if (response.statusCode !== 200) {
+          reject(new Error(`HTTP ${response.statusCode}`));
+          return;
+        }
+
+        const chunks = [];
+        response.on("data", (chunk) => chunks.push(chunk));
+        response.on("end", () => {
+          const buffer = Buffer.concat(chunks);
+          const base64 = buffer.toString("base64");
+          const contentType = response.headers["content-type"] || "image/jpeg";
+          resolve(`data:${contentType};base64,${base64}`);
+        });
+      })
+      .on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
       });
-    }).on("error", (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
   });
 }
 
@@ -109,14 +112,20 @@ async function migrateImages() {
       const metadata = JSON.parse(collection.metadata);
       const originalPaths = metadata.originalPaths || [];
 
-      console.log(`[${i + 1}/${collections.length}] ${collectionName} (${originalPaths.length} images)`);
+      console.log(
+        `[${i + 1}/${collections.length}] ${collectionName} (${
+          originalPaths.length
+        } images)`
+      );
 
       const base64Photos = [];
       let skippedCount = 0;
 
       for (let j = 0; j < originalPaths.length; j++) {
         const photoPath = originalPaths[j];
-        process.stdout.write(`  Converting ${j + 1}/${originalPaths.length}... `);
+        process.stdout.write(
+          `  Converting ${j + 1}/${originalPaths.length}... `
+        );
 
         const base64 = await imageToBase64(photoPath);
         if (base64) {
@@ -152,11 +161,15 @@ async function migrateImages() {
 
       totalConverted += base64Photos.length;
       totalSkipped += skippedCount;
-      
-      console.log(`  ✓ Saved ${base64Photos.length}/${originalPaths.length} images\n`);
+
+      console.log(
+        `  ✓ Saved ${base64Photos.length}/${originalPaths.length} images\n`
+      );
     }
 
-    console.log(`✅ Migrated photo collections: ${totalConverted} images, ${totalSkipped} skipped\n`);
+    console.log(
+      `✅ Migrated photo collections: ${totalConverted} images, ${totalSkipped} skipped\n`
+    );
 
     // ========================================
     // 3. Migrate Singular Images
@@ -175,7 +188,7 @@ async function migrateImages() {
 
       for (const [key, imagePath] of Object.entries(singularImages)) {
         process.stdout.write(`  Converting ${key}... `);
-        
+
         const base64 = await imageToBase64(imagePath);
         if (base64) {
           processedSingularImages[key] = base64;
@@ -200,7 +213,9 @@ async function migrateImages() {
         }
       );
 
-      console.log(`\n✅ Singular images: ${singularConverted} converted, ${singularSkipped} skipped\n`);
+      console.log(
+        `\n✅ Singular images: ${singularConverted} converted, ${singularSkipped} skipped\n`
+      );
     }
 
     // ========================================
@@ -215,14 +230,18 @@ async function migrateImages() {
     let pageImageCount = 0;
 
     for (const page of pages) {
-      const pageName = page.configKey.replace('page_', '');
+      const pageName = page.configKey.replace("page_", "");
       const pageData = JSON.parse(page.configData);
       let pageConverted = 0;
 
       if (pageData.sections && Array.isArray(pageData.sections)) {
         for (const section of pageData.sections) {
           // Single image
-          if (section.image && typeof section.image === 'string' && section.image.startsWith('/')) {
+          if (
+            section.image &&
+            typeof section.image === "string" &&
+            section.image.startsWith("/")
+          ) {
             const base64 = await imageToBase64(section.image);
             if (base64) {
               section.image = base64;
@@ -234,7 +253,7 @@ async function migrateImages() {
           if (section.images && Array.isArray(section.images)) {
             const base64Images = [];
             for (const imgPath of section.images) {
-              if (typeof imgPath === 'string' && imgPath.startsWith('/')) {
+              if (typeof imgPath === "string" && imgPath.startsWith("/")) {
                 const base64 = await imageToBase64(imgPath);
                 if (base64) {
                   base64Images.push(base64);
@@ -277,7 +296,9 @@ async function migrateImages() {
     console.log("==================================================");
     console.log("🎉 Image Migration completed!\n");
     console.log("📊 Summary:");
-    console.log(`   - Collection Images: ${totalConverted} converted, ${totalSkipped} skipped`);
+    console.log(
+      `   - Collection Images: ${totalConverted} converted, ${totalSkipped} skipped`
+    );
     console.log(`   - Page Images: ${pageImageCount} converted`);
     console.log(`   - Total Images: ${totalConverted + pageImageCount}`);
   } catch (error) {

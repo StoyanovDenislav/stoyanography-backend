@@ -16,7 +16,7 @@ async function fetchPageHandler(req, res) {
   try {
     // Process config directly without caching
     const fullConfig = await processNewConfig(path);
-    
+
     // Extract the specific page
     let result;
     if (serviceName) {

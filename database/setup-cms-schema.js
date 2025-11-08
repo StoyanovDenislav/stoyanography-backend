@@ -72,7 +72,11 @@ async function setupCMSSchema() {
     // Create indexes for performance
     console.log("📊 Creating indexes...");
 
-    const createIndex = async (className, propertyName, indexType = "NOTUNIQUE") => {
+    const createIndex = async (
+      className,
+      propertyName,
+      indexType = "NOTUNIQUE"
+    ) => {
       try {
         const indexName = `${className}_${propertyName}_idx`;
         await db.query(
@@ -81,7 +85,9 @@ async function setupCMSSchema() {
         console.log(`  ✓ Created index on ${className}.${propertyName}`);
       } catch (error) {
         if (error.message.includes("already exists")) {
-          console.log(`  ⏭️  Index on ${className}.${propertyName} already exists`);
+          console.log(
+            `  ⏭️  Index on ${className}.${propertyName} already exists`
+          );
         } else {
           console.log(`  ⚠️  Warning creating index: ${error.message}`);
         }
@@ -96,11 +102,14 @@ async function setupCMSSchema() {
     console.log("🎉 CMS Schema setup completed successfully!\n");
     console.log("📝 Summary:");
     console.log("   - CMSConfig: Stores all config data as key-value pairs");
-    console.log("   - CMSPhotoCollection: Stores photo collections with base64 images");
+    console.log(
+      "   - CMSPhotoCollection: Stores photo collections with base64 images"
+    );
     console.log("\n💡 Next steps:");
     console.log("   1. Run the migration script to populate the database");
-    console.log("   2. Update frontend to fetch from API instead of JSON files");
-
+    console.log(
+      "   2. Update frontend to fetch from API instead of JSON files"
+    );
   } catch (error) {
     console.error("❌ Error setting up CMS schema:", error);
     process.exit(1);

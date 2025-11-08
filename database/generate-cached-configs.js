@@ -29,40 +29,40 @@ function ensureCacheDir() {
  */
 async function buildPageConfig(db, pageName) {
   console.log(`  📄 Building config for: ${pageName}`);
-  
+
   // Get page config
   const pageResult = await db.query(
     `SELECT configData FROM CMSConfig WHERE configKey = :key`,
     { params: { key: `page_${pageName}` } }
   );
-  
+
   if (pageResult.length === 0) {
     console.log(`  ⚠️  Page not found: ${pageName}`);
     return null;
   }
-  
+
   const pageConfig = JSON.parse(pageResult[0].configData);
-  
+
   // Get photo collections referenced in this page
   const collections = new Set();
-  
+
   if (pageConfig.sections) {
     for (const section of pageConfig.sections) {
       if (section.type === "portfolio" && section.collections) {
-        section.collections.forEach(col => collections.add(col));
+        section.collections.forEach((col) => collections.add(col));
       }
     }
   }
-  
+
   // Fetch all collections for this page
   const photoCollections = {};
-  
+
   for (const collectionName of collections) {
     const collectionResult = await db.query(
       `SELECT photos, translations, metadata FROM CMSPhotoCollection WHERE collectionName = :name`,
       { params: { name: collectionName } }
     );
-    
+
     if (collectionResult.length > 0) {
       const collection = collectionResult[0];
       photoCollections[collectionName] = {
@@ -71,7 +71,7 @@ async function buildPageConfig(db, pageName) {
       };
     }
   }
-  
+
   return {
     page: pageConfig,
     photoCollections,
@@ -83,9 +83,9 @@ async function buildPageConfig(db, pageName) {
  */
 async function buildGlobalConfig(db) {
   console.log(`  🌐 Building global config`);
-  
+
   const config = {};
-  
+
   // Get maintenance mode
   const maintenanceResult = await db.query(
     `SELECT configData FROM CMSConfig WHERE configKey = 'maintainance_mode'`
@@ -94,7 +94,7 @@ async function buildGlobalConfig(db) {
     const data = JSON.parse(maintenanceResult[0].configData);
     config.maintainance_mode = data.enabled || false;
   }
-  
+
   // Get banners
   const bannersResult = await db.query(
     `SELECT configData FROM CMSConfig WHERE configKey = 'banners'`
@@ -102,7 +102,7 @@ async function buildGlobalConfig(db) {
   if (bannersResult.length > 0) {
     config.banners = JSON.parse(bannersResult[0].configData);
   }
-  
+
   // Get singular images
   const singularResult = await db.query(
     `SELECT configData FROM CMSConfig WHERE configKey = 'SingularImages'`
@@ -110,7 +110,7 @@ async function buildGlobalConfig(db) {
   if (singularResult.length > 0) {
     config.SingularImages = JSON.parse(singularResult[0].configData);
   }
-  
+
   return config;
 }
 
@@ -119,15 +119,15 @@ async function buildGlobalConfig(db) {
  */
 async function buildServicesOverviewConfig(db) {
   console.log(`  📋 Building services overview config`);
-  
+
   const result = await db.query(
     `SELECT configData FROM CMSConfig WHERE configKey = 'page_servicesOverview'`
   );
-  
+
   if (result.length > 0) {
     return JSON.parse(result[0].configData);
   }
-  
+
   return null;
 }
 
@@ -136,32 +136,32 @@ async function buildServicesOverviewConfig(db) {
  */
 async function buildGalleryConfig(db) {
   console.log(`  🖼️  Building gallery config`);
-  
+
   // Get page config
   const pageResult = await db.query(
     `SELECT configData FROM CMSConfig WHERE configKey = 'page_gallery'`
   );
-  
+
   if (pageResult.length === 0) {
     return null;
   }
-  
+
   const pageConfig = JSON.parse(pageResult[0].configData);
-  
+
   // Get ALL photo collections for gallery
   const collectionsResult = await db.query(
     `SELECT collectionName, photos, translations FROM CMSPhotoCollection`
   );
-  
+
   const photoCollections = {};
-  
+
   for (const collection of collectionsResult) {
     photoCollections[collection.collectionName] = {
       photos: collection.photos,
       translations: JSON.parse(collection.translations),
     };
   }
-  
+
   return {
     page: pageConfig,
     photoCollections,
@@ -173,17 +173,17 @@ async function buildGalleryConfig(db) {
  */
 async function generateCachedConfigs() {
   let db;
-  
+
   try {
     console.log("🚀 Starting Cached Config Generation...\n");
-    
+
     ensureCacheDir();
-    
+
     // Connect to database
     console.log("📦 Connecting to OrientDB...");
     db = new ODatabase(dbConfig);
     console.log("✅ Connected successfully\n");
-    
+
     // Generate global config
     console.log("🌐 Generating Global Config...\n");
     const globalConfig = await buildGlobalConfig(db);
@@ -192,7 +192,7 @@ async function generateCachedConfigs() {
       JSON.stringify(globalConfig, null, 2)
     );
     console.log("  ✓ Saved: cache/configs/global.json\n");
-    
+
     // Generate services overview
     console.log("📋 Generating Services Overview Config...\n");
     const servicesOverview = await buildServicesOverviewConfig(db);
@@ -203,11 +203,11 @@ async function generateCachedConfigs() {
       );
       console.log("  ✓ Saved: cache/configs/servicesOverview.json\n");
     }
-    
+
     // Generate service page configs (portrait, prom, business)
     console.log("📄 Generating Service Page Configs...\n");
     const servicePages = ["portrait", "prom", "business"];
-    
+
     for (const pageName of servicePages) {
       const pageConfig = await buildPageConfig(db, pageName);
       if (pageConfig) {
@@ -219,7 +219,7 @@ async function generateCachedConfigs() {
       }
     }
     console.log();
-    
+
     // Generate gallery config
     console.log("🖼️  Generating Gallery Config...\n");
     const galleryConfig = await buildGalleryConfig(db);
@@ -230,11 +230,11 @@ async function generateCachedConfigs() {
       );
       console.log("  ✓ Saved: cache/configs/gallery.json\n");
     }
-    
+
     // Generate about/contacts pages with same structure as other pages
     console.log("📄 Generating Other Page Configs...\n");
     const otherPages = ["aboutme", "contacts"];
-    
+
     for (const pageName of otherPages) {
       const pageConfig = await buildPageConfig(db, pageName);
       if (pageConfig) {
@@ -246,7 +246,7 @@ async function generateCachedConfigs() {
       }
     }
     console.log();
-    
+
     // Summary
     console.log("==================================================");
     console.log("🎉 Cache Generation Completed!\n");
@@ -260,7 +260,6 @@ async function generateCachedConfigs() {
     console.log("   - aboutme.json");
     console.log("   - contacts.json");
     console.log("\n💡 These files will be served by the backend API");
-    
   } catch (error) {
     console.error("\n❌ Generation failed:", error);
     throw error;

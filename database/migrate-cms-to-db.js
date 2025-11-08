@@ -30,45 +30,48 @@ const IMAGE_ORIGIN = "https://cdn.stoyanography.com";
 async function downloadImageAsBase64(url) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith("https://") ? https : http;
-    
+
     const options = {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://stoyanography.com'
-      }
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Referer: "https://stoyanography.com",
+      },
     };
-    
+
     const timeout = setTimeout(() => {
-      reject(new Error('Request timeout'));
+      reject(new Error("Request timeout"));
     }, 10000); // 10 second timeout
-    
-    client.get(url, options, (response) => {
-      clearTimeout(timeout);
-      
-      // Handle redirects
-      if (response.statusCode === 301 || response.statusCode === 302) {
-        return downloadImageAsBase64(response.headers.location)
-          .then(resolve)
-          .catch(reject);
-      }
 
-      if (response.statusCode !== 200) {
-        reject(new Error(`HTTP ${response.statusCode}`));
-        return;
-      }
+    client
+      .get(url, options, (response) => {
+        clearTimeout(timeout);
 
-      const chunks = [];
-      response.on("data", (chunk) => chunks.push(chunk));
-      response.on("end", () => {
-        const buffer = Buffer.concat(chunks);
-        const base64 = buffer.toString("base64");
-        const contentType = response.headers["content-type"] || "image/jpeg";
-        resolve(`data:${contentType};base64,${base64}`);
+        // Handle redirects
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          return downloadImageAsBase64(response.headers.location)
+            .then(resolve)
+            .catch(reject);
+        }
+
+        if (response.statusCode !== 200) {
+          reject(new Error(`HTTP ${response.statusCode}`));
+          return;
+        }
+
+        const chunks = [];
+        response.on("data", (chunk) => chunks.push(chunk));
+        response.on("end", () => {
+          const buffer = Buffer.concat(chunks);
+          const base64 = buffer.toString("base64");
+          const contentType = response.headers["content-type"] || "image/jpeg";
+          resolve(`data:${contentType};base64,${base64}`);
+        });
+      })
+      .on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
       });
-    }).on("error", (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
   });
 }
 
@@ -79,17 +82,18 @@ async function imageToBase64(imagePath) {
   try {
     // Construct full URL
     const imageUrl = `${IMAGE_ORIGIN}${imagePath}`;
-    
+
     const base64 = await downloadImageAsBase64(imageUrl);
     return base64;
   } catch (error) {
     // Don't log every error to keep output clean
-    if (!error.message.includes('HTTP 403')) {
+    if (!error.message.includes("HTTP 403")) {
       console.warn(`  ⚠️  Skipping ${imagePath}: ${error.message}`);
     }
     return null;
   }
-}/**
+}
+/**
  * Process a photo collection - convert all images to base64
  */
 async function processPhotoCollection(
@@ -97,7 +101,11 @@ async function processPhotoCollection(
   collectionData,
   progressCallback
 ) {
-  console.log(`  📸 Processing collection: ${collectionName} (${collectionData.photos?.length || 0} images)`);
+  console.log(
+    `  📸 Processing collection: ${collectionName} (${
+      collectionData.photos?.length || 0
+    } images)`
+  );
 
   const photos = collectionData.photos || [];
   const base64Photos = [];
@@ -121,7 +129,9 @@ async function processPhotoCollection(
   if (errorCount > 0) {
     console.log(`  ⚠️  Skipped ${errorCount} images due to errors`);
   }
-  console.log(`  ✓ Successfully converted ${base64Photos.length}/${photos.length} images\n`);
+  console.log(
+    `  ✓ Successfully converted ${base64Photos.length}/${photos.length} images\n`
+  );
 
   return {
     collectionName,
@@ -141,7 +151,7 @@ async function processPhotoCollection(
 async function processPageConfig(pageName, pageData) {
   let convertedCount = 0;
   let skippedCount = 0;
-  
+
   if (pageData.sections && Array.isArray(pageData.sections)) {
     for (const section of pageData.sections) {
       if (section.image) {
@@ -153,7 +163,7 @@ async function processPageConfig(pageName, pageData) {
           skippedCount++;
         }
       }
-      
+
       if (section.images && Array.isArray(section.images)) {
         const base64Images = [];
         for (const imgPath of section.images) {
@@ -169,13 +179,16 @@ async function processPageConfig(pageName, pageData) {
       }
     }
   }
-  
+
   if (convertedCount > 0 || skippedCount > 0) {
-    console.log(`  📷 Images: ${convertedCount} converted, ${skippedCount} skipped`);
+    console.log(
+      `  📷 Images: ${convertedCount} converted, ${skippedCount} skipped`
+    );
   }
-  
+
   return pageData;
-}/**
+}
+/**
  * Main migration function
  */
 async function migrateCMSToDB() {
@@ -256,12 +269,12 @@ async function migrateCMSToDB() {
     // 2. Migrate Singular Images
     // ========================================
     console.log("🖼️  Migrating Singular Images...\n");
-    
+
     const singularImages = configCMS.SingularImages || {};
     const processedSingularImages = {};
     let singularConverted = 0;
     let singularSkipped = 0;
-    
+
     for (const [key, imagePath] of Object.entries(singularImages)) {
       const base64 = await imageToBase64(imagePath);
       if (base64) {
@@ -272,8 +285,11 @@ async function migrateCMSToDB() {
         singularSkipped++;
       }
     }
-    
-    console.log(`  ✓ Converted: ${singularConverted}, Skipped: ${singularSkipped}`);    await db.query(
+
+    console.log(
+      `  ✓ Converted: ${singularConverted}, Skipped: ${singularSkipped}`
+    );
+    await db.query(
       `DELETE VERTEX CMSConfig WHERE configKey = 'SingularImages'`
     );
     await db.query(
