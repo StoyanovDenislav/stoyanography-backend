@@ -28,12 +28,12 @@ function ensureCacheDir() {
 function getAuthenticatedLink(imagePath) {
   const secret = process.env.SECRET;
   const secret_ref = process.env.SECRET_REF;
-  
+
   // 1 week expiry
-  const expiry = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
+  const expiry = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
   const hashRef = secret_ref + expiry;
   const ref = crypto.createHash("md5").update(hashRef, "utf8").digest("hex");
-  
+
   // hashUtil.generateLink does everything!
   return generateLink({ secret, path: imagePath, expiry, ref });
 }
@@ -60,7 +60,7 @@ async function buildPageConfig(db, pageName) {
       }
     }
   }
-  
+
   // Special case: home page needs portfolio collection for hero banner
   if (pageName === "home") {
     collections.add("portfolio");
@@ -76,11 +76,15 @@ async function buildPageConfig(db, pageName) {
 
     if (collectionResult.length > 0) {
       const collection = collectionResult[0];
-      const metadata = collection.metadata ? JSON.parse(collection.metadata) : {};
+      const metadata = collection.metadata
+        ? JSON.parse(collection.metadata)
+        : {};
       const originalPaths = metadata.originalPaths || [];
-      
+
       // Just pass each path through hashUtil!
-      const authenticatedPhotos = originalPaths.map(imagePath => getAuthenticatedLink(imagePath));
+      const authenticatedPhotos = originalPaths.map((imagePath) =>
+        getAuthenticatedLink(imagePath)
+      );
 
       if (authenticatedPhotos.length > 0) {
         photoCollections[collectionName] = {
@@ -123,12 +127,12 @@ async function buildGlobalConfig(db) {
   if (singularResult.length > 0) {
     const singularImages = JSON.parse(singularResult[0].configData);
     const authenticatedSingularImages = {};
-    
+
     // Just pass each path through hashUtil!
     for (const [key, imagePath] of Object.entries(singularImages)) {
       authenticatedSingularImages[key] = getAuthenticatedLink(imagePath);
     }
-    
+
     config.SingularImages = authenticatedSingularImages;
   }
 
@@ -144,15 +148,17 @@ async function buildServicesOverviewConfig(db) {
 
   if (result.length > 0) {
     const config = JSON.parse(result[0].configData);
-    
+
     // Just pass each path through hashUtil!
     if (config.serviceItems) {
       config.serviceItems = config.serviceItems.map((item) => ({
         ...item,
-        imageUrl: item.imageUrl ? getAuthenticatedLink(item.imageUrl) : item.imageUrl,
+        imageUrl: item.imageUrl
+          ? getAuthenticatedLink(item.imageUrl)
+          : item.imageUrl,
       }));
     }
-    
+
     return config;
   }
 
@@ -180,9 +186,11 @@ async function buildGalleryConfig(db) {
   for (const collection of collectionsResult) {
     const metadata = collection.metadata ? JSON.parse(collection.metadata) : {};
     const originalPaths = metadata.originalPaths || [];
-    
+
     // Just pass each path through hashUtil!
-    const authenticatedPhotos = originalPaths.map(imagePath => getAuthenticatedLink(imagePath));
+    const authenticatedPhotos = originalPaths.map((imagePath) =>
+      getAuthenticatedLink(imagePath)
+    );
 
     if (authenticatedPhotos.length > 0) {
       photoCollections[collection.collectionName] = {

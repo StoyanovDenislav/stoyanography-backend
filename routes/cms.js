@@ -42,7 +42,7 @@ function generateETag(filename) {
 function isCacheStale(filename) {
   const modTime = getFileModTime(filename);
   if (!modTime) return true;
-  
+
   const age = Date.now() - modTime;
   return age > CACHE_DURATION;
 }
@@ -53,8 +53,11 @@ function isCacheStale(filename) {
 function regenerateAuthenticatedLinks() {
   return new Promise((resolve, reject) => {
     console.log("🔄 Regenerating authenticated links...");
-    const scriptPath = path.join(__dirname, "../database/generate-cached-configs-with-auth.js");
-    
+    const scriptPath = path.join(
+      __dirname,
+      "../database/generate-cached-configs-with-auth.js"
+    );
+
     exec(`node ${scriptPath}`, (error, stdout, stderr) => {
       if (error) {
         console.error("❌ Regeneration failed:", error);
@@ -87,13 +90,13 @@ function readConfigFile(filename) {
 
   const content = fs.readFileSync(filePath, "utf-8");
   const data = JSON.parse(content);
-  
+
   // Store in memory cache
   configCache.set(filename, {
     data,
     timestamp: Date.now(),
   });
-  
+
   return data;
 }
 
@@ -138,9 +141,9 @@ async function buildPageConfigFromDB(db, pageName) {
       if (collectionResult.length > 0) {
         const collection = collectionResult[0];
         const photos = collection.photos || [];
-        
+
         // Only include collections that have been migrated (have base64 data)
-        if (photos.length > 0 && photos[0].startsWith('data:image')) {
+        if (photos.length > 0 && photos[0].startsWith("data:image")) {
           photoCollections[collectionName] = {
             photos: photos,
             translations: JSON.parse(collection.translations),
@@ -148,7 +151,10 @@ async function buildPageConfigFromDB(db, pageName) {
         }
       }
     } catch (error) {
-      console.error(`Error fetching collection ${collectionName}:`, error.message);
+      console.error(
+        `Error fetching collection ${collectionName}:`,
+        error.message
+      );
       // Skip this collection and continue
     }
   }
@@ -235,7 +241,7 @@ async function buildGalleryConfigFromDB(db) {
 router.get("/global", async (req, res) => {
   try {
     const filename = "global.json";
-    
+
     // Check if cache is stale
     if (isCacheStale(filename)) {
       console.log("⚠️  Cache is stale, regenerating...");
@@ -244,7 +250,7 @@ router.get("/global", async (req, res) => {
 
     // Generate ETag
     const etag = generateETag(filename);
-    
+
     // Check If-None-Match header
     if (req.headers["if-none-match"] === etag) {
       return res.status(304).send(); // Not Modified
@@ -256,12 +262,13 @@ router.get("/global", async (req, res) => {
     if (!config) {
       return res.status(404).json({
         success: false,
-        error: "Global config not found. Run: node database/generate-cached-configs-with-auth.js",
+        error:
+          "Global config not found. Run: node database/generate-cached-configs-with-auth.js",
       });
     }
 
     res.set({
-      "ETag": etag,
+      ETag: etag,
       "Cache-Control": "public, max-age=3600", // 1 hour
     });
 
@@ -288,7 +295,7 @@ router.get("/page/:pageName", async (req, res) => {
 
   try {
     const filename = `${pageName}.json`;
-    
+
     // Check if cache is stale
     if (isCacheStale(filename)) {
       console.log(`⚠️  Cache for ${pageName} is stale, regenerating...`);
@@ -297,7 +304,7 @@ router.get("/page/:pageName", async (req, res) => {
 
     // Generate ETag
     const etag = generateETag(filename);
-    
+
     // Check If-None-Match header
     if (req.headers["if-none-match"] === etag) {
       return res.status(304).send(); // Not Modified
@@ -314,7 +321,7 @@ router.get("/page/:pageName", async (req, res) => {
     }
 
     res.set({
-      "ETag": etag,
+      ETag: etag,
       "Cache-Control": "public, max-age=3600", // 1 hour
     });
 
@@ -339,7 +346,7 @@ router.get("/page/:pageName", async (req, res) => {
 router.post("/regenerate", async (req, res) => {
   try {
     await regenerateAuthenticatedLinks();
-    
+
     res.json({
       success: true,
       message: "Authenticated links regenerated successfully",
@@ -361,7 +368,7 @@ router.post("/cache/clear", (req, res) => {
   try {
     const size = configCache.size;
     configCache.clear();
-    
+
     res.json({
       success: true,
       message: `Cleared ${size} cached entries`,
@@ -385,10 +392,17 @@ router.get("/health", (req, res) => {
     memoryEntries: configCache.size,
     cacheAge: {},
   };
-  
+
   // Check age of each config file
-  const files = ["global.json", "servicesOverview.json", "portrait.json", "prom.json", "business.json", "gallery.json"];
-  files.forEach(file => {
+  const files = [
+    "global.json",
+    "servicesOverview.json",
+    "portrait.json",
+    "prom.json",
+    "business.json",
+    "gallery.json",
+  ];
+  files.forEach((file) => {
     const modTime = getFileModTime(file);
     if (modTime) {
       const ageMs = Date.now() - modTime;
@@ -399,7 +413,7 @@ router.get("/health", (req, res) => {
       };
     }
   });
-  
+
   res.json({
     success: true,
     service: "CMS API",

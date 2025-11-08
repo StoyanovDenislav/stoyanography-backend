@@ -14,7 +14,12 @@ async function testImageDownload(imagePath) {
       .update(secretRef + expiry, "utf8")
       .digest("hex");
 
-    const authenticatedUrl = generateLink({ secret, path: imagePath, expiry, ref });
+    const authenticatedUrl = generateLink({
+      secret,
+      path: imagePath,
+      expiry,
+      ref,
+    });
 
     console.log("Testing authenticated image download...");
     console.log("Image path:", imagePath);
@@ -50,12 +55,12 @@ async function testImageDownload(imagePath) {
           const buffer = Buffer.concat(chunks);
           const base64 = buffer.toString("base64");
           const dataUrl = `data:${response.headers["content-type"]};base64,${base64}`;
-          
+
           console.log("\n✅ Image downloaded successfully!");
           console.log("Base64 length:", base64.length);
           console.log("Data URL length:", dataUrl.length);
           console.log("First 100 chars of base64:", base64.substring(0, 100));
-          
+
           resolve(dataUrl);
         });
       })

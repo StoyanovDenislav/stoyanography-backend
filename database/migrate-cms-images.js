@@ -30,7 +30,12 @@ async function downloadImageAsBase64(imagePath) {
       .update(secretRef + expiry, "utf8")
       .digest("hex");
 
-    const authenticatedUrl = generateLink({ secret, path: imagePath, expiry, ref });
+    const authenticatedUrl = generateLink({
+      secret,
+      path: imagePath,
+      expiry,
+      ref,
+    });
 
     const client = authenticatedUrl.startsWith("https://") ? https : http;
 
@@ -58,7 +63,9 @@ async function downloadImageAsBase64(imagePath) {
         }
 
         if (response.statusCode !== 200) {
-          console.error(`Failed to download ${imagePath}: HTTP ${response.statusCode}`);
+          console.error(
+            `Failed to download ${imagePath}: HTTP ${response.statusCode}`
+          );
           reject(new Error(`HTTP ${response.statusCode}`));
           return;
         }
@@ -130,7 +137,9 @@ async function migrateImages() {
       // Skip if already migrated
       if (metadata.migratedImages === true) {
         console.log(
-          `[${i + 1}/${collections.length}] ${collectionName} - ✓ Already migrated (skipping)\n`
+          `[${i + 1}/${
+            collections.length
+          }] ${collectionName} - ✓ Already migrated (skipping)\n`
         );
         alreadyMigrated++;
         continue;
@@ -231,13 +240,10 @@ async function migrateImages() {
       }
     }
 
-    console.log(
-      `✅ Photo Collections Summary:`
-    );
+    console.log(`✅ Photo Collections Summary:`);
     console.log(`   - Already migrated: ${alreadyMigrated}`);
     console.log(`   - Newly converted: ${totalConverted} images`);
     console.log(`   - Skipped: ${totalSkipped} images\n`);
-
 
     // ========================================
     // 3. Migrate Singular Images

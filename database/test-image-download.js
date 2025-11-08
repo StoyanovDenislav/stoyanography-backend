@@ -49,9 +49,7 @@ async function testImageDownload(imagePath) {
           const buffer = Buffer.concat(chunks);
           const sizeKB = (buffer.length / 1024).toFixed(2);
           console.log(`✅ Downloaded successfully: ${sizeKB} KB`);
-          console.log(
-            `🖼️  Content-Type: ${response.headers["content-type"]}`
-          );
+          console.log(`🖼️  Content-Type: ${response.headers["content-type"]}`);
           resolve({
             success: true,
             size: buffer.length,
@@ -70,7 +68,7 @@ async function testImageDownload(imagePath) {
 // Test with a sample image path
 async function runTest() {
   console.log("🚀 Testing Image Download from CDN\n");
-  console.log("=" .repeat(60));
+  console.log("=".repeat(60));
 
   // Test paths - add actual image paths from your collections
   const testPaths = [
@@ -85,7 +83,7 @@ async function runTest() {
       console.error("❌ Test failed for:", path);
       console.error("   Error:", error.message);
     }
-    console.log("=" .repeat(60));
+    console.log("=".repeat(60));
   }
 }
 
