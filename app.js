@@ -12,6 +12,8 @@ const fs = require("fs");
 const SendTestEmail = require("./nodemailer.js");
 const apiRouter = require("./routes/api.js");
 const adminRouter = require("./routes/admin.js");
+const bookingRouter = require("./routes/booking.js");
+const authRouter = require("./routes/auth.js");
 const cacheManager = require("./utils/CacheManager");
 const fetchLink = require("./legacy/utils/fetchLink");
 //const db = require("./database")
@@ -37,6 +39,13 @@ app.use((req, res, next) => {
 
   console.log("Origin:", origin);
 
+  // Allow requests without Origin header (same-origin or direct API calls)
+  if (!origin) {
+    console.log("No origin header - allowing request");
+    next();
+    return;
+  }
+
   const isAllowed = allowedOrigins.some((allowed) => {
     const regex = new RegExp(`^${allowed.replace(/\*/g, ".*")}\/?$`);
     const result = regex.test(origin);
@@ -44,14 +53,21 @@ app.use((req, res, next) => {
     return result;
   });
 
-  if (origin && isAllowed) {
+  if (isAllowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT");
+    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT,DELETE");
     res.setHeader(
       "Access-Control-Allow-Headers",
-      "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers"
+      "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers, Cookie"
     );
+    
+    // Handle preflight
+    if (req.method === "OPTIONS") {
+      res.sendStatus(200);
+      return;
+    }
+    
     next();
   } else {
     res.status(403).send(`
@@ -199,7 +215,9 @@ app.use(
   })
 );
 app.use(apiRouter);
+app.use("/api/auth", authRouter);
 app.use("/admin", adminRouter);
+app.use("/api/booking", bookingRouter);
 
 // Startup config processing function
 async function preProcessConfigs() {
