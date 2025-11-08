@@ -14,7 +14,8 @@ const apiRouter = require("./routes/api.js");
 const adminRouter = require("./routes/admin.js");
 const bookingRouter = require("./routes/booking.js");
 const authRouter = require("./routes/auth.js");
-const cacheManager = require("./utils/CacheManager");
+const cmsRouter = require("./routes/cms.js");
+
 const fetchLink = require("./legacy/utils/fetchLink");
 //const db = require("./database")
 
@@ -221,6 +222,7 @@ app.use(apiRouter);
 app.use("/api/auth", authRouter);
 app.use("/admin", adminRouter);
 app.use("/api/booking", bookingRouter);
+app.use("/api/cms", cmsRouter);
 
 // Startup config processing function
 async function preProcessConfigs() {
@@ -273,12 +275,6 @@ async function preProcessConfigs() {
     `📝 Monitoring ${configPaths.length} config(s): ${configPaths.join(", ")}`
   );
 
-  // Use hash-based change detection instead of processing everything
-  await cacheManager.checkAllConfigs(configPaths);
-
-  // Start hourly monitoring
-  cacheManager.startHourlyConfigCheck(configPaths);
-
   console.log("🎉 Startup config processing and monitoring setup completed");
 }
 const isDev = process.env.NODE_ENV !== "production";
@@ -323,7 +319,7 @@ server.listen(port, async () => {
 // Graceful shutdown handler
 process.on("SIGTERM", () => {
   console.log("Received SIGTERM, shutting down gracefully...");
-  cacheManager.stopHourlyConfigCheck();
+
   server.close(() => {
     console.log("Server gracefully terminated");
     process.exit(0);
@@ -332,7 +328,6 @@ process.on("SIGTERM", () => {
 
 process.on("SIGINT", () => {
   console.log("Received SIGINT, shutting down gracefully...");
-  cacheManager.stopHourlyConfigCheck();
   server.close(() => {
     console.log("Server gracefully terminated");
     process.exit(0);

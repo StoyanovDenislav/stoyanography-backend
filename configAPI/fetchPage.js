@@ -1,4 +1,4 @@
-const cacheManager = require("../utils/CacheManager");
+const processNewConfig = require("../utils/processNewConfig");
 
 async function fetchPageHandler(req, res) {
   const { path, pageName, serviceName } = req.query;
@@ -14,27 +14,28 @@ async function fetchPageHandler(req, res) {
   }
 
   try {
-    // Use cache manager for threaded processing and caching
-    const result = await cacheManager.getCachedPage(
-      path,
-      pageName,
-      serviceName
-    );
-
-    // Set caching headers based on environment
-    const isDev = process.env.NODE_ENV === "development";
-    if (isDev) {
-      // No caching in development mode
-      res.setHeader(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, proxy-revalidate"
-      );
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
+    // Process config directly without caching
+    const fullConfig = await processNewConfig(path);
+    
+    // Extract the specific page
+    let result;
+    if (serviceName) {
+      result = fullConfig?.Pages?.services?.[serviceName];
     } else {
-      // Cache for 1 hour in production (server-side cache handles the heavy lifting)
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      result = fullConfig?.Pages?.[pageName];
     }
+
+    if (!result) {
+      return res.status(404).json({ error: "Page not found" });
+    }
+
+    // Set no-cache headers
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
 
     res.status(200).json(result);
   } catch (error) {

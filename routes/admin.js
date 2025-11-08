@@ -1,5 +1,4 @@
 const express = require("express");
-const cacheManager = require("../utils/CacheManager");
 const BookingUtils = require("../utils/bookingUtils");
 const { body, validationResult } = require("express-validator");
 const { sendCancellationEmail } = require("../utils/bookingEmailer");
@@ -10,113 +9,12 @@ const router = express.Router();
 // Apply JWT authentication to all admin routes
 router.use(authenticateToken);
 
-// Get cache statistics
-router.get("/cache/stats", (req, res) => {
-  try {
-    const stats = cacheManager.getStats();
-    res.json({
-      success: true,
-      stats,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Clear all cache
-router.delete("/cache/clear", async (req, res) => {
-  try {
-    await cacheManager.clearCache();
-    res.json({
-      success: true,
-      message: "Cache cleared successfully",
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Warm cache for specific config
-router.post("/cache/warm", async (req, res) => {
-  try {
-    const { configPath } = req.body;
-
-    if (!configPath) {
-      return res.status(400).json({
-        success: false,
-        error: "configPath is required",
-      });
-    }
-
-    // Start warming in background
-    cacheManager
-      .warmCacheForConfig(configPath)
-      .then(() => {
-        console.log(`✅ Cache warming completed for: ${configPath}`);
-      })
-      .catch((error) => {
-        console.error(`❌ Cache warming failed for ${configPath}:`, error);
-      });
-
-    res.json({
-      success: true,
-      message: `Cache warming started for: ${configPath}`,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Invalidate specific config cache
-router.delete("/cache/invalidate", async (req, res) => {
-  try {
-    const { configPath } = req.body;
-
-    if (!configPath) {
-      return res.status(400).json({
-        success: false,
-        error: "configPath is required",
-      });
-    }
-
-    await cacheManager.invalidateConfig(configPath);
-
-    res.json({
-      success: true,
-      message: `Cache invalidated for: ${configPath}`,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Health check endpoint that includes cache status
+// Health check endpoint
 router.get("/health", (req, res) => {
   try {
-    const stats = cacheManager.getStats();
     res.json({
       status: "healthy",
       timestamp: new Date().toISOString(),
-      cache: {
-        enabled: true,
-        ...stats,
-      },
       server: {
         nodeEnv: process.env.NODE_ENV,
         uptime: process.uptime(),
