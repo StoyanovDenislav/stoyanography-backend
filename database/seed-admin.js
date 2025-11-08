@@ -24,10 +24,14 @@ async function seedAdminUser() {
     await db.open();
 
     // Check if admin already exists
-    const existing = await db.query("SELECT FROM AdminUser WHERE username = 'admin'");
+    const existing = await db.query(
+      "SELECT FROM AdminUser WHERE username = 'admin'"
+    );
     if (existing.length > 0) {
       console.log("⚠️  Admin user already exists. Skipping...");
-      console.log("   If you want to reset the password, delete the user first.");
+      console.log(
+        "   If you want to reset the password, delete the user first."
+      );
       process.exit(0);
     }
 
@@ -36,7 +40,8 @@ async function seedAdminUser() {
     const passwordHash = await bcrypt.hash(defaultPassword, 10);
 
     // Create admin user
-    const result = await db.insert()
+    const result = await db
+      .insert()
       .into("AdminUser")
       .set({
         username: "admin",
@@ -45,8 +50,8 @@ async function seedAdminUser() {
         firstName: "System",
         lastName: "Administrator",
         isActive: true,
-        createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        lastLoginAt: null
+        createdAt: new Date().toISOString().replace("T", " ").substring(0, 19),
+        lastLoginAt: null,
       })
       .one();
 
@@ -54,8 +59,9 @@ async function seedAdminUser() {
     console.log("\n📋 Default Credentials:");
     console.log("   Username: admin");
     console.log("   Password: ChangeMe123!");
-    console.log("\n⚠️  IMPORTANT: Change this password immediately after first login!");
-
+    console.log(
+      "\n⚠️  IMPORTANT: Change this password immediately after first login!"
+    );
   } catch (error) {
     console.error("❌ Error seeding admin user:", error);
     process.exit(1);

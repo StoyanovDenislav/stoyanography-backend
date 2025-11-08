@@ -42,7 +42,9 @@ async function listAdminUsers() {
       console.log(`   Active: ${user.isActive ? "✅ Yes" : "❌ No"}`);
       console.log(`   Created: ${new Date(user.createdAt).toLocaleString()}`);
       if (user.lastLoginAt) {
-        console.log(`   Last Login: ${new Date(user.lastLoginAt).toLocaleString()}`);
+        console.log(
+          `   Last Login: ${new Date(user.lastLoginAt).toLocaleString()}`
+        );
       } else {
         console.log(`   Last Login: Never`);
       }
@@ -52,7 +54,6 @@ async function listAdminUsers() {
     console.log("\n" + "─".repeat(80));
     console.log("\n💡 To drop a user, run:");
     console.log("   node database/drop-admin.js <username>");
-
   } catch (error) {
     console.error("❌ Error listing admin users:", error);
     process.exit(1);

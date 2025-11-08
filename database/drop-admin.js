@@ -46,7 +46,6 @@ async function dropAdminUser() {
     console.log(`✅ Admin user '${username}' has been deleted successfully!`);
     console.log("\n💡 To create a new admin user, run:");
     console.log("   node database/seed-admin.js");
-
   } catch (error) {
     console.error("❌ Error dropping admin user:", error);
     process.exit(1);

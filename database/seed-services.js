@@ -19,36 +19,40 @@ const db = server.use({
 const services = [
   {
     name: "Business Photography",
-    description: "Professional business photography for corporate portraits, headshots, and product photography. Perfect for executives, entrepreneurs, and corporate teams.",
+    description:
+      "Professional business photography for corporate portraits, headshots, and product photography. Perfect for executives, entrepreneurs, and corporate teams.",
     duration: 60,
-    price: 150.00,
+    price: 150.0,
     currency: "EUR",
     color: "#3B82F6",
     isActive: true,
   },
   {
     name: "Prom Photography",
-    description: "Capture your special prom night with stunning photos. Full coverage of your prom experience including preparation, arrival, and dance floor moments.",
+    description:
+      "Capture your special prom night with stunning photos. Full coverage of your prom experience including preparation, arrival, and dance floor moments.",
     duration: 90,
-    price: 120.00,
+    price: 120.0,
     currency: "EUR",
     color: "#EC4899",
     isActive: true,
   },
   {
     name: "Consultation",
-    description: "Initial consultation to discuss your photography needs, review portfolio, and plan your upcoming photo session. Great for understanding what to expect.",
+    description:
+      "Initial consultation to discuss your photography needs, review portfolio, and plan your upcoming photo session. Great for understanding what to expect.",
     duration: 30,
-    price: 0.00,
+    price: 0.0,
     currency: "EUR",
     color: "#10B981",
     isActive: true,
   },
   {
     name: "Portrait Photography",
-    description: "Professional portrait photography for individuals and families. Includes wardrobe changes, multiple locations, and creative poses to capture your personality.",
+    description:
+      "Professional portrait photography for individuals and families. Includes wardrobe changes, multiple locations, and creative poses to capture your personality.",
     duration: 75,
-    price: 180.00,
+    price: 180.0,
     currency: "EUR",
     color: "#F59E0B",
     isActive: true,

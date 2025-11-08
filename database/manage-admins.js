@@ -29,7 +29,7 @@ function question(query) {
 
 async function listAdmins() {
   const users = await db.query("SELECT FROM AdminUser ORDER BY createdAt");
-  
+
   if (users.length === 0) {
     console.log("\n⚠️  No admin users found.\n");
     return [];
@@ -45,7 +45,9 @@ async function listAdmins() {
     console.log(`   Active: ${user.isActive ? "✅ Yes" : "❌ No"}`);
     console.log(`   Created: ${new Date(user.createdAt).toLocaleString()}`);
     if (user.lastLoginAt) {
-      console.log(`   Last Login: ${new Date(user.lastLoginAt).toLocaleString()}`);
+      console.log(
+        `   Last Login: ${new Date(user.lastLoginAt).toLocaleString()}`
+      );
     }
   });
 
@@ -82,37 +84,43 @@ async function createAdmin() {
   const passwordHash = await bcrypt.hash(password, 10);
 
   // Create user
-  await db.insert().into("AdminUser").set({
-    username,
-    email,
-    passwordHash,
-    firstName,
-    lastName,
-    isActive: true,
-    createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    lastLoginAt: null
-  }).one();
+  await db
+    .insert()
+    .into("AdminUser")
+    .set({
+      username,
+      email,
+      passwordHash,
+      firstName,
+      lastName,
+      isActive: true,
+      createdAt: new Date().toISOString().replace("T", " ").substring(0, 19),
+      lastLoginAt: null,
+    })
+    .one();
 
   console.log(`\n✅ Admin user '${username}' created successfully!`);
 }
 
 async function deleteAdmin() {
   const users = await listAdmins();
-  
+
   if (users.length === 0) {
     return;
   }
 
   const username = await question("Enter username to delete (or 'cancel'): ");
 
-  if (username.toLowerCase() === 'cancel') {
+  if (username.toLowerCase() === "cancel") {
     console.log("\n❌ Operation cancelled.");
     return;
   }
 
-  const confirm = await question(`⚠️  Are you sure you want to delete '${username}'? (yes/no): `);
+  const confirm = await question(
+    `⚠️  Are you sure you want to delete '${username}'? (yes/no): `
+  );
 
-  if (confirm.toLowerCase() !== 'yes') {
+  if (confirm.toLowerCase() !== "yes") {
     console.log("\n❌ Operation cancelled.");
     return;
   }
@@ -131,14 +139,16 @@ async function deleteAdmin() {
 
 async function resetPassword() {
   const users = await listAdmins();
-  
+
   if (users.length === 0) {
     return;
   }
 
-  const username = await question("Enter username to reset password (or 'cancel'): ");
+  const username = await question(
+    "Enter username to reset password (or 'cancel'): "
+  );
 
-  if (username.toLowerCase() === 'cancel') {
+  if (username.toLowerCase() === "cancel") {
     console.log("\n❌ Operation cancelled.");
     return;
   }
@@ -175,14 +185,16 @@ async function resetPassword() {
 
 async function toggleActive() {
   const users = await listAdmins();
-  
+
   if (users.length === 0) {
     return;
   }
 
-  const username = await question("Enter username to toggle active status (or 'cancel'): ");
+  const username = await question(
+    "Enter username to toggle active status (or 'cancel'): "
+  );
 
-  if (username.toLowerCase() === 'cancel') {
+  if (username.toLowerCase() === "cancel") {
     console.log("\n❌ Operation cancelled.");
     return;
   }
@@ -207,7 +219,9 @@ async function toggleActive() {
     { params: { isActive: newStatus, username } }
   );
 
-  console.log(`\n✅ User '${username}' is now ${newStatus ? "ACTIVE" : "INACTIVE"}!`);
+  console.log(
+    `\n✅ User '${username}' is now ${newStatus ? "ACTIVE" : "INACTIVE"}!`
+  );
 }
 
 async function mainMenu() {

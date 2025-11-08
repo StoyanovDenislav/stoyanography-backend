@@ -229,7 +229,9 @@ router.get("/check-availability", async (req, res) => {
     while (currentTime + duration <= endTimeInMinutes) {
       const hours = Math.floor(currentTime / 60);
       const minutes = currentTime % 60;
-      const timeString = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+      const timeString = `${hours.toString().padStart(2, "0")}:${minutes
+        .toString()
+        .padStart(2, "0")}`;
 
       // Check if this slot overlaps with any existing booking
       const slotEndTime = currentTime + duration;
@@ -309,7 +311,9 @@ router.post(
     body("customerPhone")
       .optional()
       .trim()
-      .matches(/^[+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/)
+      .matches(
+        /^[+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/
+      )
       .withMessage("Invalid phone number"),
     body("date").notEmpty().withMessage("Date is required").isISO8601(),
     body("time")
@@ -340,12 +344,14 @@ router.post(
       const bookingData = req.body;
 
       // Calculate endTime from time + serviceDuration
-      const [hours, minutes] = bookingData.time.split(':').map(Number);
+      const [hours, minutes] = bookingData.time.split(":").map(Number);
       const startMinutes = hours * 60 + minutes;
       const endMinutes = startMinutes + parseInt(bookingData.serviceDuration);
       const endHours = Math.floor(endMinutes / 60);
       const endMins = endMinutes % 60;
-      const endTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
+      const endTime = `${String(endHours).padStart(2, "0")}:${String(
+        endMins
+      ).padStart(2, "0")}`;
 
       // Check if time slot is available
       const isAvailable = await BookingUtils.isTimeSlotAvailable(
@@ -363,9 +369,7 @@ router.post(
 
       // Check if booking is within allowed advance booking period
       const settings = await BookingUtils.getSettings();
-      const bookingDate = new Date(
-        `${bookingData.date}T${bookingData.time}`
-      );
+      const bookingDate = new Date(`${bookingData.date}T${bookingData.time}`);
       const now = new Date();
       const maxAdvanceDate = new Date(
         now.getTime() + settings.advanceBookingDays * 24 * 60 * 60 * 1000
@@ -484,7 +488,10 @@ router.post(
   "/cancel",
   bookingLimiter,
   [
-    body("bookingNumber").trim().notEmpty().withMessage("Booking number is required"),
+    body("bookingNumber")
+      .trim()
+      .notEmpty()
+      .withMessage("Booking number is required"),
     body("customerEmail")
       .trim()
       .notEmpty()

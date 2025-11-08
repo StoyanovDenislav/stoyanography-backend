@@ -87,15 +87,11 @@ async function seedTimeSlots() {
             // Insert batch
             for (const slot of batch) {
               try {
-                await db
-                  .insert()
-                  .into("TimeSlot")
-                  .set(slot)
-                  .one();
+                await db.insert().into("TimeSlot").set(slot).one();
                 slotsCreated++;
               } catch (error) {
                 // Ignore duplicates
-                if (!error.message.includes('duplicate')) {
+                if (!error.message.includes("duplicate")) {
                   console.error(`Error inserting slot: ${error.message}`);
                 }
               }
@@ -111,15 +107,11 @@ async function seedTimeSlots() {
     if (batch.length > 0) {
       for (const slot of batch) {
         try {
-          await db
-            .insert()
-            .into("TimeSlot")
-            .set(slot)
-            .one();
+          await db.insert().into("TimeSlot").set(slot).one();
           slotsCreated++;
         } catch (error) {
           // Ignore duplicates
-          if (!error.message.includes('duplicate')) {
+          if (!error.message.includes("duplicate")) {
             console.error(`Error inserting slot: ${error.message}`);
           }
         }
@@ -127,7 +119,11 @@ async function seedTimeSlots() {
     }
 
     console.log(`\nSuccessfully created ${slotsCreated} time slots!`);
-    console.log(`Coverage: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]}`);
+    console.log(
+      `Coverage: ${startDate.toISOString().split("T")[0]} to ${
+        endDate.toISOString().split("T")[0]
+      }`
+    );
     process.exit(0);
   } catch (error) {
     console.error("Error seeding time slots:", error);

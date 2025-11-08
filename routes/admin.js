@@ -339,11 +339,11 @@ router.get("/services", async (req, res) => {
   try {
     const db = require("../database_inquiry");
     await db.open();
-    
+
     const services = await db.query(
       "SELECT * FROM BookingService ORDER BY displayOrder, name"
     );
-    
+
     await db.close();
 
     res.json({
@@ -438,7 +438,7 @@ router.put("/services/:serviceId", async (req, res) => {
     await db.open();
 
     await db.update(serviceId).set(updateData).one();
-    
+
     const updatedService = await db
       .select()
       .from("BookingService")

@@ -8,8 +8,10 @@ const db = require("../database_inquiry");
 const router = express.Router();
 
 // JWT secrets from environment
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "access-secret-change-this";
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "refresh-secret-change-this";
+const ACCESS_TOKEN_SECRET =
+  process.env.ACCESS_TOKEN_SECRET || "access-secret-change-this";
+const REFRESH_TOKEN_SECRET =
+  process.env.REFRESH_TOKEN_SECRET || "refresh-secret-change-this";
 
 // Token expiry times
 const ACCESS_TOKEN_EXPIRY = "5m"; // 5 minutes
@@ -44,15 +46,19 @@ async function storeRefreshToken(userId, token, req) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
 
-  await db.insert().into("RefreshToken").set({
-    token: token,
-    userId: userId,
-    expiresAt: expiresAt.toISOString().replace('T', ' ').substring(0, 19),
-    createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    userAgent: req.headers['user-agent'] || '',
-    ipAddress: req.ip || req.connection.remoteAddress || '',
-    isRevoked: false
-  }).one();
+  await db
+    .insert()
+    .into("RefreshToken")
+    .set({
+      token: token,
+      userId: userId,
+      expiresAt: expiresAt.toISOString().replace("T", " ").substring(0, 19),
+      createdAt: new Date().toISOString().replace("T", " ").substring(0, 19),
+      userAgent: req.headers["user-agent"] || "",
+      ipAddress: req.ip || req.connection.remoteAddress || "",
+      isRevoked: false,
+    })
+    .one();
 }
 
 /**
@@ -107,9 +113,15 @@ router.post(
       }
 
       // Update last login time
-      await db.update(user["@rid"]).set({
-        lastLoginAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      }).one();
+      await db
+        .update(user["@rid"])
+        .set({
+          lastLoginAt: new Date()
+            .toISOString()
+            .replace("T", " ")
+            .substring(0, 19),
+        })
+        .one();
 
       // Generate tokens
       const accessToken = generateAccessToken(user);
@@ -165,7 +177,7 @@ router.post("/refresh", async (req, res) => {
     // Decode the expired/expiring access token (don't verify, just decode)
     const decoded = jwt.decode(accessToken);
 
-    if (!decoded || typeof decoded === 'string' || !decoded.userId) {
+    if (!decoded || typeof decoded === "string" || !decoded.userId) {
       return res.status(401).json({
         success: false,
         message: "Invalid token format",
@@ -195,10 +207,9 @@ router.post("/refresh", async (req, res) => {
     const expiresAt = new Date(tokenRecord.expiresAt);
     if (expiresAt < new Date()) {
       // Delete expired token
-      await db.query(
-        "DELETE VERTEX RefreshToken WHERE token = :token",
-        { params: { token: tokenRecord.token } }
-      );
+      await db.query("DELETE VERTEX RefreshToken WHERE token = :token", {
+        params: { token: tokenRecord.token },
+      });
 
       return res.status(401).json({
         success: false,
@@ -208,7 +219,7 @@ router.post("/refresh", async (req, res) => {
 
     // Get user
     const user = await db.record.get(decoded.userId);
-    
+
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
@@ -258,8 +269,8 @@ router.post("/logout", async (req, res) => {
     try {
       // Decode token to get userId
       const decoded = jwt.decode(accessToken);
-      
-      if (decoded && typeof decoded !== 'string' && decoded.userId) {
+
+      if (decoded && typeof decoded !== "string" && decoded.userId) {
         await db.open();
 
         // Revoke all refresh tokens for this user
@@ -305,7 +316,7 @@ router.post("/verify", async (req, res) => {
 
     // Verify user still exists and is active
     const user = await db.record.get(decoded.userId);
-    
+
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
@@ -323,7 +334,10 @@ router.post("/verify", async (req, res) => {
       },
     });
   } catch (error) {
-    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
+    if (
+      error.name === "JsonWebTokenError" ||
+      error.name === "TokenExpiredError"
+    ) {
       return res.status(401).json({
         success: false,
         message: "Invalid or expired token",
@@ -348,12 +362,18 @@ router.post("/verify", async (req, res) => {
 router.post(
   "/change-password",
   [
-    body("currentPassword").notEmpty().withMessage("Current password is required"),
+    body("currentPassword")
+      .notEmpty()
+      .withMessage("Current password is required"),
     body("newPassword")
       .isLength({ min: 8 })
       .withMessage("New password must be at least 8 characters")
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-      .withMessage("Password must contain uppercase, lowercase, number, and special character"),
+      .matches(
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
+      )
+      .withMessage(
+        "Password must contain uppercase, lowercase, number, and special character"
+      ),
   ],
   async (req, res) => {
     // Validate input
@@ -383,7 +403,7 @@ router.post(
 
       // Get user
       const user = await db.record.get(decoded.userId);
-      
+
       if (!user || !user.isActive) {
         return res.status(401).json({
           success: false,
@@ -392,7 +412,10 @@ router.post(
       }
 
       // Verify current password
-      const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+      const isPasswordValid = await bcrypt.compare(
+        currentPassword,
+        user.passwordHash
+      );
       if (!isPasswordValid) {
         return res.status(401).json({
           success: false,
@@ -404,9 +427,12 @@ router.post(
       const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
       // Update password
-      await db.update(decoded.userId).set({
-        passwordHash: newPasswordHash,
-      }).one();
+      await db
+        .update(decoded.userId)
+        .set({
+          passwordHash: newPasswordHash,
+        })
+        .one();
 
       // Revoke all refresh tokens for this user (force re-login on all devices)
       await db.query(
@@ -419,7 +445,10 @@ router.post(
         message: "Password changed successfully. Please log in again.",
       });
     } catch (error) {
-      if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
+      if (
+        error.name === "JsonWebTokenError" ||
+        error.name === "TokenExpiredError"
+      ) {
         return res.status(401).json({
           success: false,
           message: "Invalid or expired token",

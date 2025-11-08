@@ -75,7 +75,7 @@ class BookingUtils {
 
       // Format dates for OrientDB (just date string, not datetime)
       const now = new Date();
-      const createdAtStr = now.toISOString().replace('T', ' ').substring(0, 19);
+      const createdAtStr = now.toISOString().replace("T", " ").substring(0, 19);
 
       const booking = await db
         .insert()
@@ -113,7 +113,7 @@ class BookingUtils {
 
       // Invalidate booking cache
       invalidateBookingCache();
-      
+
       // Invalidate slots cache for this date
       const slotCacheKey = `${bookingData.date}`;
       slotsCache.delete(slotCacheKey);
@@ -163,16 +163,20 @@ class BookingUtils {
     }
   }
 
-    /**
+  /**
    * Get bookings by date range with caching
    */
   static async getBookingsByDateRange(startDate, endDate, status = null) {
     // Check cache first
-    const cacheKey = getCacheKey('bookings', { startDate, endDate, status });
-    const cached = getFromCache(bookingsCache, cacheKey, BOOKINGS_CACHE_DURATION);
-    
+    const cacheKey = getCacheKey("bookings", { startDate, endDate, status });
+    const cached = getFromCache(
+      bookingsCache,
+      cacheKey,
+      BOOKINGS_CACHE_DURATION
+    );
+
     if (cached) {
-      console.log('📦 Returning cached bookings');
+      console.log("📦 Returning cached bookings");
       return cached;
     }
 
@@ -190,10 +194,10 @@ class BookingUtils {
       query += ` ORDER BY date, startTime`;
 
       const bookings = await db.query(query, { params });
-      
+
       // Cache the results
       setCache(bookingsCache, cacheKey, bookings);
-      
+
       return bookings;
     } finally {
       await db.close();
@@ -204,9 +208,13 @@ class BookingUtils {
    * Get bookings for a specific date (for availability checking)
    */
   static async getBookingsForDate(date) {
-    const cacheKey = getCacheKey('bookingsForDate', { date });
-    const cached = getFromCache(bookingsCache, cacheKey, BOOKINGS_CACHE_DURATION);
-    
+    const cacheKey = getCacheKey("bookingsForDate", { date });
+    const cached = getFromCache(
+      bookingsCache,
+      cacheKey,
+      BOOKINGS_CACHE_DURATION
+    );
+
     if (cached) {
       return cached;
     }
@@ -219,7 +227,7 @@ class BookingUtils {
          WHERE date = :date AND status IN ['pending', 'confirmed']`,
         { params: { date } }
       );
-      
+
       setCache(bookingsCache, cacheKey, bookings);
       return bookings;
     } finally {
@@ -261,7 +269,7 @@ class BookingUtils {
       const formattedID = `#${recordID.cluster}:${recordID.position}`;
 
       const now = new Date();
-      const updatedAtStr = now.toISOString().replace('T', ' ').substring(0, 19);
+      const updatedAtStr = now.toISOString().replace("T", " ").substring(0, 19);
 
       const updateData = {
         status,
@@ -299,7 +307,7 @@ class BookingUtils {
       const formattedID = `#${recordID.cluster}:${recordID.position}`;
 
       const now = new Date();
-      const updatedAtStr = now.toISOString().replace('T', ' ').substring(0, 19);
+      const updatedAtStr = now.toISOString().replace("T", " ").substring(0, 19);
 
       await db
         .update(formattedID)
@@ -324,7 +332,7 @@ class BookingUtils {
 
       // Invalidate booking cache
       invalidateBookingCache();
-      
+
       // Invalidate slots cache for this date
       const slotCacheKey = `${booking.date}`;
       slotsCache.delete(slotCacheKey);
@@ -532,11 +540,11 @@ class BookingUtils {
    */
   static async getAvailableSlots(startDate, endDate, serviceDuration = null) {
     const cacheKey = `slots_${startDate}_${endDate}`;
-    
+
     // Check cache first
     const cached = slotsCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log('✓ Returning cached slots');
+      console.log("✓ Returning cached slots");
       return cached.data;
     }
 
@@ -563,7 +571,7 @@ class BookingUtils {
       );
 
       // Convert db slots to plain objects
-      const slots = dbSlots.map(slot => ({
+      const slots = dbSlots.map((slot) => ({
         date: slot.date,
         startTime: slot.startTime,
         endTime: slot.endTime,
@@ -618,9 +626,9 @@ class BookingUtils {
       // Cache the result
       slotsCache.set(cacheKey, {
         data: availableSlots,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      console.log('✓ Cached slots for:', cacheKey);
+      console.log("✓ Cached slots for:", cacheKey);
 
       return availableSlots;
     } finally {
@@ -636,11 +644,15 @@ class BookingUtils {
    */
   static async getBookingStats(startDate = null, endDate = null) {
     // Check cache first
-    const cacheKey = getCacheKey('stats', { startDate, endDate });
-    const cached = getFromCache(bookingsCache, cacheKey, BOOKINGS_CACHE_DURATION);
-    
+    const cacheKey = getCacheKey("stats", { startDate, endDate });
+    const cached = getFromCache(
+      bookingsCache,
+      cacheKey,
+      BOOKINGS_CACHE_DURATION
+    );
+
     if (cached) {
-      console.log('📦 Returning cached stats');
+      console.log("📦 Returning cached stats");
       return cached;
     }
 

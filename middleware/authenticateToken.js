@@ -1,7 +1,8 @@
 const jwt = require("jsonwebtoken");
 const db = require("../database_inquiry");
 
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "access-secret-change-this";
+const ACCESS_TOKEN_SECRET =
+  process.env.ACCESS_TOKEN_SECRET || "access-secret-change-this";
 
 /**
  * Middleware to verify JWT access token from cookie and authenticate admin users
@@ -22,11 +23,11 @@ async function authenticateToken(req, res, next) {
 
     // Verify user exists and is active in database
     await db.open();
-    
+
     const user = await db.record.get(decoded.userId);
-    
+
     await db.close();
-    
+
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
@@ -56,7 +57,7 @@ async function authenticateToken(req, res, next) {
         message: "Invalid token",
       });
     }
-    
+
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,

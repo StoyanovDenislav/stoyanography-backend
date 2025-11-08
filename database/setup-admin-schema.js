@@ -20,11 +20,11 @@ const db = server.use({
 async function createClass(className, superClass = null) {
   try {
     const exists = await db.class.list();
-    if (exists.some(c => c.name === className)) {
+    if (exists.some((c) => c.name === className)) {
       console.log(`✓ Class ${className} already exists, skipping...`);
       return false;
     }
-    
+
     await db.class.create(className, superClass);
     console.log(`✓ Created class: ${className}`);
     return true;
@@ -38,13 +38,18 @@ async function createClass(className, superClass = null) {
 }
 
 // Helper function to create property
-async function createProperty(className, propertyName, propertyType, options = {}) {
+async function createProperty(
+  className,
+  propertyName,
+  propertyType,
+  options = {}
+) {
   try {
     const classObj = await db.class.get(className);
     await classObj.property.create({
       name: propertyName,
       type: propertyType,
-      ...options
+      ...options,
     });
     console.log(`  ✓ Added property: ${propertyName} (${propertyType})`);
   } catch (error) {
@@ -67,13 +72,28 @@ async function setupAdminSchema() {
     await createClass("AdminUser", "V");
 
     // Add properties to AdminUser
-    await createProperty("AdminUser", "username", "String", { mandatory: true, notNull: true });
-    await createProperty("AdminUser", "email", "String", { mandatory: true, notNull: true });
-    await createProperty("AdminUser", "passwordHash", "String", { mandatory: true, notNull: true });
+    await createProperty("AdminUser", "username", "String", {
+      mandatory: true,
+      notNull: true,
+    });
+    await createProperty("AdminUser", "email", "String", {
+      mandatory: true,
+      notNull: true,
+    });
+    await createProperty("AdminUser", "passwordHash", "String", {
+      mandatory: true,
+      notNull: true,
+    });
     await createProperty("AdminUser", "firstName", "String");
     await createProperty("AdminUser", "lastName", "String");
-    await createProperty("AdminUser", "isActive", "Boolean", { mandatory: true, notNull: true });
-    await createProperty("AdminUser", "createdAt", "DateTime", { mandatory: true, notNull: true });
+    await createProperty("AdminUser", "isActive", "Boolean", {
+      mandatory: true,
+      notNull: true,
+    });
+    await createProperty("AdminUser", "createdAt", "DateTime", {
+      mandatory: true,
+      notNull: true,
+    });
     await createProperty("AdminUser", "lastLoginAt", "DateTime");
 
     // Create unique index on username
@@ -82,7 +102,7 @@ async function setupAdminSchema() {
         name: "AdminUser.username",
         type: "unique",
         class: "AdminUser",
-        properties: ["username"]
+        properties: ["username"],
       });
       console.log("  ✓ Created unique index on username");
     } catch (error) {
@@ -99,7 +119,7 @@ async function setupAdminSchema() {
         name: "AdminUser.email",
         type: "unique",
         class: "AdminUser",
-        properties: ["email"]
+        properties: ["email"],
       });
       console.log("  ✓ Created unique index on email");
     } catch (error) {
@@ -115,13 +135,28 @@ async function setupAdminSchema() {
     await createClass("RefreshToken", "V");
 
     // Add properties to RefreshToken
-    await createProperty("RefreshToken", "token", "String", { mandatory: true, notNull: true });
-    await createProperty("RefreshToken", "userId", "String", { mandatory: true, notNull: true });
-    await createProperty("RefreshToken", "expiresAt", "DateTime", { mandatory: true, notNull: true });
-    await createProperty("RefreshToken", "createdAt", "DateTime", { mandatory: true, notNull: true });
+    await createProperty("RefreshToken", "token", "String", {
+      mandatory: true,
+      notNull: true,
+    });
+    await createProperty("RefreshToken", "userId", "String", {
+      mandatory: true,
+      notNull: true,
+    });
+    await createProperty("RefreshToken", "expiresAt", "DateTime", {
+      mandatory: true,
+      notNull: true,
+    });
+    await createProperty("RefreshToken", "createdAt", "DateTime", {
+      mandatory: true,
+      notNull: true,
+    });
     await createProperty("RefreshToken", "userAgent", "String");
     await createProperty("RefreshToken", "ipAddress", "String");
-    await createProperty("RefreshToken", "isRevoked", "Boolean", { mandatory: true, notNull: true });
+    await createProperty("RefreshToken", "isRevoked", "Boolean", {
+      mandatory: true,
+      notNull: true,
+    });
 
     // Create index on token
     try {
@@ -129,7 +164,7 @@ async function setupAdminSchema() {
         name: "RefreshToken.token",
         type: "unique",
         class: "RefreshToken",
-        properties: ["token"]
+        properties: ["token"],
       });
       console.log("  ✓ Created unique index on token");
     } catch (error) {
@@ -146,7 +181,7 @@ async function setupAdminSchema() {
         name: "RefreshToken.userId",
         type: "notunique",
         class: "RefreshToken",
-        properties: ["userId"]
+        properties: ["userId"],
       });
       console.log("  ✓ Created index on userId");
     } catch (error) {
@@ -159,9 +194,10 @@ async function setupAdminSchema() {
 
     console.log("\n✅ Admin schema setup complete!");
     console.log("\nNext steps:");
-    console.log("1. Run: node database/seed-admin.js (to create default admin user)");
+    console.log(
+      "1. Run: node database/seed-admin.js (to create default admin user)"
+    );
     console.log("2. Admin credentials will be: admin / ChangeMe123!");
-
   } catch (error) {
     console.error("❌ Error setting up admin schema:", error);
     process.exit(1);

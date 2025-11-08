@@ -56,18 +56,21 @@ app.use((req, res, next) => {
   if (isAllowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT,DELETE");
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET,HEAD,OPTIONS,POST,PUT,DELETE"
+    );
     res.setHeader(
       "Access-Control-Allow-Headers",
       "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers, Cookie"
     );
-    
+
     // Handle preflight
     if (req.method === "OPTIONS") {
       res.sendStatus(200);
       return;
     }
-    
+
     next();
   } else {
     res.status(403).send(`
