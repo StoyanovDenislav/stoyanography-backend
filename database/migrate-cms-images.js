@@ -1,6 +1,8 @@
 const ODatabase = require("orientjs").ODatabase;
 const https = require("https");
 const http = require("http");
+const crypto = require("crypto");
+const { generateLink } = require("../utils/hashUtil");
 require("dotenv").config();
 
 const dbConfig = {
@@ -12,20 +14,31 @@ const dbConfig = {
   useToken: true,
 };
 
-const IMAGE_ORIGIN = "https://stoyanography.com";
+const IMAGE_ORIGIN = "https://cdn.stoyanography.com";
 
 /**
- * Download image from URL and convert to base64
+ * Download image from URL with authentication and convert to base64
  */
-async function downloadImageAsBase64(url) {
+async function downloadImageAsBase64(imagePath) {
   return new Promise((resolve, reject) => {
-    const client = url.startsWith("https://") ? https : http;
+    // Generate authenticated URL using the same system as fetchLink.js
+    const secret = process.env.SECRET;
+    const secretRef = process.env.SECRET_REF;
+    const expiry = Date.now() + 300000; // 5 minutes from now
+    const ref = crypto
+      .createHash("md5")
+      .update(secretRef + expiry, "utf8")
+      .digest("hex");
+
+    const authenticatedUrl = generateLink({ secret, path: imagePath, expiry, ref });
+
+    const client = authenticatedUrl.startsWith("https://") ? https : http;
 
     const options = {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Referer: "https://stoyanography.com",
+        Referer: "stoyanography.com",
       },
     };
 
@@ -34,7 +47,7 @@ async function downloadImageAsBase64(url) {
     }, 15000); // 15 second timeout
 
     client
-      .get(url, options, (response) => {
+      .get(authenticatedUrl, options, (response) => {
         clearTimeout(timeout);
 
         // Handle redirects
@@ -45,6 +58,7 @@ async function downloadImageAsBase64(url) {
         }
 
         if (response.statusCode !== 200) {
+          console.error(`Failed to download ${imagePath}: HTTP ${response.statusCode}`);
           reject(new Error(`HTTP ${response.statusCode}`));
           return;
         }
@@ -66,14 +80,14 @@ async function downloadImageAsBase64(url) {
 }
 
 /**
- * Convert image path to base64 by fetching from production server
+ * Convert image path to base64 by fetching from production server with authentication
  */
 async function imageToBase64(imagePath) {
   try {
-    const imageUrl = `${IMAGE_ORIGIN}${imagePath}`;
-    const base64 = await downloadImageAsBase64(imageUrl);
+    const base64 = await downloadImageAsBase64(imagePath);
     return base64;
   } catch (error) {
+    console.error(`Error converting ${imagePath} to base64:`, error.message);
     return null;
   }
 }
@@ -105,12 +119,22 @@ async function migrateImages() {
 
     let totalConverted = 0;
     let totalSkipped = 0;
+    let alreadyMigrated = 0;
 
     for (let i = 0; i < collections.length; i++) {
       const collection = collections[i];
       const collectionName = collection.collectionName;
       const metadata = JSON.parse(collection.metadata);
       const originalPaths = metadata.originalPaths || [];
+
+      // Skip if already migrated
+      if (metadata.migratedImages === true) {
+        console.log(
+          `[${i + 1}/${collections.length}] ${collectionName} - ✓ Already migrated (skipping)\n`
+        );
+        alreadyMigrated++;
+        continue;
+      }
 
       console.log(
         `[${i + 1}/${collections.length}] ${collectionName} (${
@@ -121,55 +145,99 @@ async function migrateImages() {
       const base64Photos = [];
       let skippedCount = 0;
 
+      // First, clear existing photos array
+      try {
+        await db.query(
+          `UPDATE CMSPhotoCollection SET photos = [] WHERE collectionName = :collectionName`,
+          {
+            params: { collectionName },
+          }
+        );
+      } catch (error) {
+        console.error(
+          `\n  ✗ Failed to clear photos for ${collectionName}: ${error.message}`
+        );
+      }
+
       for (let j = 0; j < originalPaths.length; j++) {
         const photoPath = originalPaths[j];
         process.stdout.write(
           `  Converting ${j + 1}/${originalPaths.length}... `
         );
 
-        const base64 = await imageToBase64(photoPath);
-        if (base64) {
-          base64Photos.push(base64);
-          process.stdout.write(`✓\n`);
-        } else {
+        try {
+          const base64 = await imageToBase64(photoPath);
+          if (base64) {
+            // Add photo one at a time to avoid large packet issues
+            await db.query(
+              `UPDATE CMSPhotoCollection ADD photos = :photo WHERE collectionName = :collectionName`,
+              {
+                params: {
+                  collectionName,
+                  photo: base64,
+                },
+              }
+            );
+            base64Photos.push(base64);
+            process.stdout.write(`✓\n`);
+          } else {
+            skippedCount++;
+            process.stdout.write(`✗ (skipped)\n`);
+          }
+
+          // Small delay to prevent overwhelming the server
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        } catch (error) {
           skippedCount++;
-          process.stdout.write(`✗ (skipped)\n`);
+          process.stdout.write(`✗ (error: ${error.message})\n`);
         }
       }
 
-      // Update collection with images
-      await db.query(
-        `UPDATE CMSPhotoCollection SET 
-          photos = :photos,
-          metadata = :metadata,
-          updatedAt = sysdate()
-        WHERE collectionName = :collectionName`,
-        {
-          params: {
-            collectionName,
-            photos: base64Photos,
-            metadata: JSON.stringify({
-              ...metadata,
-              totalImages: base64Photos.length,
-              skippedCount,
-              migratedImages: true,
-              migratedAt: new Date().toISOString(),
-            }),
-          },
-        }
-      );
+      try {
+        // Update metadata only
+        await db.query(
+          `UPDATE CMSPhotoCollection SET 
+            metadata = :metadata,
+            updatedAt = sysdate()
+          WHERE collectionName = :collectionName`,
+          {
+            params: {
+              collectionName,
+              metadata: JSON.stringify({
+                ...metadata,
+                totalImages: base64Photos.length,
+                skippedCount,
+                migratedImages: true,
+                migratedAt: new Date().toISOString(),
+              }),
+            },
+          }
+        );
 
-      totalConverted += base64Photos.length;
-      totalSkipped += skippedCount;
+        totalConverted += base64Photos.length;
+        totalSkipped += skippedCount;
 
-      console.log(
-        `  ✓ Saved ${base64Photos.length}/${originalPaths.length} images\n`
-      );
+        console.log(
+          `  ✓ Saved ${base64Photos.length}/${originalPaths.length} images to database\n`
+        );
+
+        // Delay between collections to prevent connection issues
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(
+          `  ✗ Failed to update metadata for ${collectionName}: ${error.message}\n`
+        );
+        throw error; // Re-throw to stop execution
+      }
     }
 
     console.log(
-      `✅ Migrated photo collections: ${totalConverted} images, ${totalSkipped} skipped\n`
+      `✅ Photo Collections Summary:`
     );
+    console.log(`   - Already migrated: ${alreadyMigrated}`);
+    console.log(`   - Newly converted: ${totalConverted} images`);
+    console.log(`   - Skipped: ${totalSkipped} images\n`);
+
 
     // ========================================
     // 3. Migrate Singular Images
