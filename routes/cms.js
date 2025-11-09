@@ -63,10 +63,10 @@ function ensureCacheDirectory() {
 function regenerateAuthenticatedLinks() {
   return new Promise((resolve, reject) => {
     console.log("🔄 Regenerating authenticated links...");
-    
+
     // Ensure cache directory exists
     ensureCacheDirectory();
-    
+
     const scriptPath = path.join(
       __dirname,
       "../database/generate-cached-configs-with-auth.js"
@@ -258,7 +258,9 @@ router.get("/global", async (req, res) => {
 
     // Check if cache is stale or missing
     if (isCacheStale(filename)) {
-      console.log("⚠️  Cache is stale or missing, regenerating automatically...");
+      console.log(
+        "⚠️  Cache is stale or missing, regenerating automatically..."
+      );
       await regenerateAuthenticatedLinks();
     }
 
@@ -311,7 +313,9 @@ router.get("/page/:pageName", async (req, res) => {
 
     // Check if cache is stale or missing
     if (isCacheStale(filename)) {
-      console.log(`⚠️  Cache for ${pageName} is stale or missing, regenerating automatically...`);
+      console.log(
+        `⚠️  Cache for ${pageName} is stale or missing, regenerating automatically...`
+      );
       await regenerateAuthenticatedLinks();
     }
 

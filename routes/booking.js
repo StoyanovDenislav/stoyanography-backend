@@ -249,9 +249,11 @@ router.get("/check-availability", async (req, res) => {
       // Check if slot overlaps with break times
       if (settings.breaks && settings.breaks.length > 0) {
         for (const breakTime of settings.breaks) {
-          const breakStart = parseInt(breakTime.start.split(":")[0]) * 60 +
+          const breakStart =
+            parseInt(breakTime.start.split(":")[0]) * 60 +
             parseInt(breakTime.start.split(":")[1]);
-          const breakEnd = parseInt(breakTime.end.split(":")[0]) * 60 +
+          const breakEnd =
+            parseInt(breakTime.end.split(":")[0]) * 60 +
             parseInt(breakTime.end.split(":")[1]);
 
           if (

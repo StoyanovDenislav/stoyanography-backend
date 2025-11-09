@@ -421,7 +421,7 @@ class BookingUtils {
       requireApproval: bookingConfig.confirmation.requireApproval,
       autoConfirm: bookingConfig.confirmation.autoConfirm,
       breaks: bookingConfig.breaks || [],
-      blockedDates: bookingConfig.blockedDates || []
+      blockedDates: bookingConfig.blockedDates || [],
     };
   }
 

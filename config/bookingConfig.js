@@ -7,7 +7,7 @@ module.exports = {
   // Working hours (24-hour format)
   workingHours: {
     start: "09:00",
-    end: "18:00"
+    end: "18:00",
   },
 
   // Working days (0 = Sunday, 1 = Monday, ... 6 = Saturday)
@@ -25,14 +25,14 @@ module.exports = {
   // Booking confirmation settings
   confirmation: {
     requireApproval: false,
-    autoConfirm: true
+    autoConfirm: true,
   },
 
   // Email notifications
   notifications: {
     sendToCustomer: true,
     sendToAdmin: true,
-    adminEmail: process.env.ADMIN_EMAIL || "admin@stoyanography.com"
+    adminEmail: process.env.ADMIN_EMAIL || "admin@stoyanography.com",
   },
 
   // Break times (optional)
@@ -44,5 +44,5 @@ module.exports = {
   blockedDates: [
     // "2025-12-25", // Christmas
     // "2025-01-01"  // New Year
-  ]
+  ],
 };

@@ -24,7 +24,8 @@ const pricingSections = {
     translationsKey: "PortraitPhotography.Pricing",
     styles: {
       container: "w-full gap-6 grid p-4 bg-transparent",
-      gridContainer: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto max-w-7xl",
+      gridContainer:
+        "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto max-w-7xl",
       card: "p-6 bg-sg-navy-600 border-2 border-sg-orange-800 rounded-xl shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-sg-orange-800/50 flex flex-col",
       title: "text-2xl font-bold text-sg-orange-800 mb-4 text-center",
       price: "text-4xl font-bold text-sg-white mb-2 text-center",
@@ -33,7 +34,8 @@ const pricingSections = {
       features: "space-y-2 mb-6",
       feature: "flex items-start gap-2 text-gray-200",
       featureIcon: "text-sg-orange-800 mt-1",
-      button: "w-full py-3 bg-gradient-to-r from-sg-orange-800 to-sg-orange-200 text-white font-bold rounded-lg hover:opacity-90 transition-opacity"
+      button:
+        "w-full py-3 bg-gradient-to-r from-sg-orange-800 to-sg-orange-200 text-white font-bold rounded-lg hover:opacity-90 transition-opacity",
     },
     packages: [
       {
@@ -51,8 +53,8 @@ const pricingSections = {
           "1 location",
           "1 outfit change",
           "15 edited photos",
-          "Online gallery"
-        ]
+          "Online gallery",
+        ],
       },
       {
         id: "portrait-standard",
@@ -70,16 +72,17 @@ const pricingSections = {
           "2 outfit changes",
           "30 edited photos",
           "Online gallery",
-          "Print-ready files"
+          "Print-ready files",
         ],
-        highlighted: true
+        highlighted: true,
       },
       {
         id: "portrait-premium",
         titleKey: "Packages.Premium.title",
         title: "Premium Portrait Session",
         descriptionKey: "Packages.Premium.description",
-        description: "Ultimate portrait experience with full creative direction",
+        description:
+          "Ultimate portrait experience with full creative direction",
         price: 400,
         currency: "EUR",
         duration: 120,
@@ -91,10 +94,10 @@ const pricingSections = {
           "50 edited photos",
           "Online gallery",
           "Print-ready files",
-          "Professional styling consultation"
-        ]
-      }
-    ]
+          "Professional styling consultation",
+        ],
+      },
+    ],
   },
   page_prom: {
     type: "pricing",
@@ -102,7 +105,8 @@ const pricingSections = {
     translationsKey: "PromPhotography.Pricing",
     styles: {
       container: "w-full gap-6 grid p-4 bg-transparent",
-      gridContainer: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto max-w-7xl",
+      gridContainer:
+        "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto max-w-7xl",
       card: "p-6 bg-sg-navy-600 border-2 border-sg-orange-800 rounded-xl shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-sg-orange-800/50 flex flex-col",
       title: "text-2xl font-bold text-sg-orange-800 mb-4 text-center",
       price: "text-4xl font-bold text-sg-white mb-2 text-center",
@@ -111,7 +115,8 @@ const pricingSections = {
       features: "space-y-2 mb-6",
       feature: "flex items-start gap-2 text-gray-200",
       featureIcon: "text-sg-orange-800 mt-1",
-      button: "w-full py-3 bg-gradient-to-r from-sg-orange-800 to-sg-orange-200 text-white font-bold rounded-lg hover:opacity-90 transition-opacity"
+      button:
+        "w-full py-3 bg-gradient-to-r from-sg-orange-800 to-sg-orange-200 text-white font-bold rounded-lg hover:opacity-90 transition-opacity",
     },
     packages: [
       {
@@ -129,8 +134,8 @@ const pricingSections = {
           "Pre-prom portraits",
           "Arrival coverage",
           "20 edited photos",
-          "Online gallery"
-        ]
+          "Online gallery",
+        ],
       },
       {
         id: "prom-group",
@@ -149,9 +154,9 @@ const pricingSections = {
           "Dance floor moments",
           "40 edited photos",
           "Online gallery",
-          "Group discount for 4+ people"
+          "Group discount for 4+ people",
         ],
-        highlighted: true
+        highlighted: true,
       },
       {
         id: "prom-full",
@@ -172,10 +177,10 @@ const pricingSections = {
           "Candid moments throughout",
           "60 edited photos",
           "Online gallery",
-          "Highlight video"
-        ]
-      }
-    ]
+          "Highlight video",
+        ],
+      },
+    ],
   },
   page_business: {
     type: "pricing",
@@ -183,7 +188,8 @@ const pricingSections = {
     translationsKey: "BusinessPhotography.Pricing",
     styles: {
       container: "w-full gap-6 grid p-4 bg-transparent",
-      gridContainer: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto max-w-7xl",
+      gridContainer:
+        "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto max-w-7xl",
       card: "p-6 bg-sg-navy-600 border-2 border-sg-orange-800 rounded-xl shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-sg-orange-800/50 flex flex-col",
       title: "text-2xl font-bold text-sg-orange-800 mb-4 text-center",
       price: "text-4xl font-bold text-sg-white mb-2 text-center",
@@ -192,7 +198,8 @@ const pricingSections = {
       features: "space-y-2 mb-6",
       feature: "flex items-start gap-2 text-gray-200",
       featureIcon: "text-sg-orange-800 mt-1",
-      button: "w-full py-3 bg-gradient-to-r from-sg-orange-800 to-sg-orange-200 text-white font-bold rounded-lg hover:opacity-90 transition-opacity"
+      button:
+        "w-full py-3 bg-gradient-to-r from-sg-orange-800 to-sg-orange-200 text-white font-bold rounded-lg hover:opacity-90 transition-opacity",
     },
     packages: [
       {
@@ -200,7 +207,8 @@ const pricingSections = {
         titleKey: "Packages.Headshot.title",
         title: "Professional Headshots",
         descriptionKey: "Packages.Headshot.description",
-        description: "Individual professional headshots for LinkedIn and corporate use",
+        description:
+          "Individual professional headshots for LinkedIn and corporate use",
         price: 120,
         currency: "EUR",
         duration: 30,
@@ -211,8 +219,8 @@ const pricingSections = {
           "2 outfit options",
           "10 edited photos",
           "High-resolution files",
-          "Online gallery"
-        ]
+          "Online gallery",
+        ],
       },
       {
         id: "business-team",
@@ -232,16 +240,17 @@ const pricingSections = {
           "50 edited photos",
           "High-resolution files",
           "Online gallery",
-          "Rush delivery available"
+          "Rush delivery available",
         ],
-        highlighted: true
+        highlighted: true,
       },
       {
         id: "business-corporate",
         titleKey: "Packages.Corporate.title",
         title: "Corporate Event Coverage",
         descriptionKey: "Packages.Corporate.description",
-        description: "Full event coverage for conferences, meetings, and corporate events",
+        description:
+          "Full event coverage for conferences, meetings, and corporate events",
         price: 600,
         currency: "EUR",
         duration: 240,
@@ -255,11 +264,11 @@ const pricingSections = {
           "100 edited photos",
           "High-resolution files",
           "Online gallery",
-          "Same-day highlight reel"
-        ]
-      }
-    ]
-  }
+          "Same-day highlight reel",
+        ],
+      },
+    ],
+  },
 };
 
 async function addPricingSections() {
@@ -268,10 +277,12 @@ async function addPricingSections() {
 
     for (const [pageKey, pricingSection] of Object.entries(pricingSections)) {
       console.log(`Processing ${pageKey}...`);
-      
+
       // Fetch the existing config
-      const result = await db.query(`SELECT FROM CMSConfig WHERE configKey = '${pageKey}'`);
-      
+      const result = await db.query(
+        `SELECT FROM CMSConfig WHERE configKey = '${pageKey}'`
+      );
+
       if (!result || result.length === 0) {
         console.log(`  ⚠️  ${pageKey} not found, skipping`);
         continue;
@@ -281,17 +292,21 @@ async function addPricingSections() {
       const data = JSON.parse(config.configData);
 
       // Check if pricing section already exists
-      const hasPricing = data.sections.some(s => s.type === "pricing");
-      
+      const hasPricing = data.sections.some((s) => s.type === "pricing");
+
       if (hasPricing) {
         console.log(`  ℹ️  Pricing section already exists, updating...`);
         // Update existing pricing section
-        const pricingIndex = data.sections.findIndex(s => s.type === "pricing");
+        const pricingIndex = data.sections.findIndex(
+          (s) => s.type === "pricing"
+        );
         data.sections[pricingIndex] = pricingSection;
       } else {
         console.log(`  ➕ Adding new pricing section...`);
         // Add pricing section (insert after accordion/paragraphs, before portfolio)
-        const portfolioIndex = data.sections.findIndex(s => s.type === "portfolio");
+        const portfolioIndex = data.sections.findIndex(
+          (s) => s.type === "portfolio"
+        );
         if (portfolioIndex !== -1) {
           data.sections.splice(portfolioIndex, 0, pricingSection);
         } else {
@@ -300,20 +315,25 @@ async function addPricingSections() {
       }
 
       // Update the config in the database
-      await db.update(config['@rid'])
+      await db
+        .update(config["@rid"])
         .set({
           configData: JSON.stringify(data),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .one();
 
       console.log(`  ✓ Updated ${pageKey}\n`);
     }
 
-    console.log("\n✅ Successfully added pricing sections to all service configs!");
-    console.log("\n🔄 Now run: node database/generate-cached-configs-with-auth.js");
+    console.log(
+      "\n✅ Successfully added pricing sections to all service configs!"
+    );
+    console.log(
+      "\n🔄 Now run: node database/generate-cached-configs-with-auth.js"
+    );
     console.log("   to regenerate the cached configs with pricing sections.");
-    
+
     process.exit(0);
   } catch (error) {
     console.error("❌ Error adding pricing sections:", error);
