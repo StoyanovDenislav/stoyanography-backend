@@ -37,14 +37,24 @@ function generateETag(filename) {
 }
 
 /**
- * Check if cache is stale (older than 7 days)
+ * Check if cache is stale (older than 7 days) or missing
  */
 function isCacheStale(filename) {
   const modTime = getFileModTime(filename);
-  if (!modTime) return true;
+  if (!modTime) return true; // Missing file = stale
 
   const age = Date.now() - modTime;
   return age > CACHE_DURATION;
+}
+
+/**
+ * Check if cache directory exists, create if not
+ */
+function ensureCacheDirectory() {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    console.log("📁 Created cache directory:", CACHE_DIR);
+  }
 }
 
 /**
@@ -53,6 +63,10 @@ function isCacheStale(filename) {
 function regenerateAuthenticatedLinks() {
   return new Promise((resolve, reject) => {
     console.log("🔄 Regenerating authenticated links...");
+    
+    // Ensure cache directory exists
+    ensureCacheDirectory();
+    
     const scriptPath = path.join(
       __dirname,
       "../database/generate-cached-configs-with-auth.js"
@@ -242,9 +256,9 @@ router.get("/global", async (req, res) => {
   try {
     const filename = "global.json";
 
-    // Check if cache is stale
+    // Check if cache is stale or missing
     if (isCacheStale(filename)) {
-      console.log("⚠️  Cache is stale, regenerating...");
+      console.log("⚠️  Cache is stale or missing, regenerating automatically...");
       await regenerateAuthenticatedLinks();
     }
 
@@ -260,10 +274,9 @@ router.get("/global", async (req, res) => {
     const config = readConfigFile(filename);
 
     if (!config) {
-      return res.status(404).json({
+      return res.status(500).json({
         success: false,
-        error:
-          "Global config not found. Run: node database/generate-cached-configs-with-auth.js",
+        error: "Failed to generate global config automatically",
       });
     }
 
@@ -296,9 +309,9 @@ router.get("/page/:pageName", async (req, res) => {
   try {
     const filename = `${pageName}.json`;
 
-    // Check if cache is stale
+    // Check if cache is stale or missing
     if (isCacheStale(filename)) {
-      console.log(`⚠️  Cache for ${pageName} is stale, regenerating...`);
+      console.log(`⚠️  Cache for ${pageName} is stale or missing, regenerating automatically...`);
       await regenerateAuthenticatedLinks();
     }
 
@@ -314,9 +327,9 @@ router.get("/page/:pageName", async (req, res) => {
     const config = readConfigFile(filename);
 
     if (!config) {
-      return res.status(404).json({
+      return res.status(500).json({
         success: false,
-        error: `Page config not found: ${pageName}. Run: node database/generate-cached-configs-with-auth.js`,
+        error: `Failed to generate config for ${pageName} automatically`,
       });
     }
 

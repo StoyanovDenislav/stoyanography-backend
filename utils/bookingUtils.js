@@ -1,4 +1,5 @@
 const db = require("../database_inquiry");
+const bookingConfig = require("../config/bookingConfig");
 
 // Simple in-memory cache for time slots
 const slotsCache = new Map();
@@ -407,38 +408,21 @@ class BookingUtils {
   }
 
   /**
-   * Get booking settings
+   * Get booking settings (now from config file)
    */
   static async getSettings() {
-    try {
-      await db.open();
-
-      const settings = await db.query("SELECT * FROM BookingSettings");
-
-      const settingsObj = {};
-      settings.forEach((setting) => {
-        let value = setting.settingValue;
-
-        // Parse value based on type
-        if (setting.settingType === "number") {
-          value = parseInt(value);
-        } else if (setting.settingType === "boolean") {
-          value = value === "true";
-        } else if (setting.settingType === "json") {
-          try {
-            value = JSON.parse(value);
-          } catch (e) {
-            console.error("Error parsing JSON setting:", setting.settingKey);
-          }
-        }
-
-        settingsObj[setting.settingKey] = value;
-      });
-
-      return settingsObj;
-    } finally {
-      await db.close();
-    }
+    return {
+      workingHoursStart: bookingConfig.workingHours.start,
+      workingHoursEnd: bookingConfig.workingHours.end,
+      workingDays: bookingConfig.workingDays,
+      slotDuration: bookingConfig.slotDuration,
+      advanceBookingDays: bookingConfig.advanceBookingDays,
+      minAdvanceHours: bookingConfig.minAdvanceHours,
+      requireApproval: bookingConfig.confirmation.requireApproval,
+      autoConfirm: bookingConfig.confirmation.autoConfirm,
+      breaks: bookingConfig.breaks || [],
+      blockedDates: bookingConfig.blockedDates || []
+    };
   }
 
   /**

@@ -172,6 +172,15 @@ router.get("/check-availability", async (req, res) => {
     // Get settings
     const settings = await BookingUtils.getSettings();
 
+    // Check if date is blocked
+    if (settings.blockedDates && settings.blockedDates.includes(date)) {
+      return res.json({
+        success: true,
+        availableTimes: [],
+        message: "This date is not available",
+      });
+    }
+
     // Check if date is a working day
     const dayOfWeek = requestedDate.getDay();
     if (!settings.workingDays.includes(dayOfWeek)) {
@@ -237,6 +246,31 @@ router.get("/check-availability", async (req, res) => {
       const slotEndTime = currentTime + duration;
       let isAvailable = true;
 
+      // Check if slot overlaps with break times
+      if (settings.breaks && settings.breaks.length > 0) {
+        for (const breakTime of settings.breaks) {
+          const breakStart = parseInt(breakTime.start.split(":")[0]) * 60 +
+            parseInt(breakTime.start.split(":")[1]);
+          const breakEnd = parseInt(breakTime.end.split(":")[0]) * 60 +
+            parseInt(breakTime.end.split(":")[1]);
+
+          if (
+            (currentTime >= breakStart && currentTime < breakEnd) ||
+            (slotEndTime > breakStart && slotEndTime <= breakEnd) ||
+            (currentTime <= breakStart && slotEndTime >= breakEnd)
+          ) {
+            isAvailable = false;
+            break;
+          }
+        }
+      }
+
+      if (!isAvailable) {
+        currentTime += settings.slotDuration;
+        continue;
+      }
+
+      // Check existing bookings
       for (const booking of existingBookings) {
         const bookingStartTime =
           parseInt(booking.startTime.split(":")[0]) * 60 +
