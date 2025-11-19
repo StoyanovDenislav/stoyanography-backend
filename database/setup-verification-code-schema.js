@@ -63,7 +63,7 @@ async function setupVerificationCodeSchema() {
 
     // Create indexes
     console.log("📊 Creating indexes...");
-    
+
     // Index on email for fast lookup
     try {
       await db.query(
@@ -94,7 +94,10 @@ async function setupVerificationCodeSchema() {
 
     console.log("\n✅ VerificationCode schema setup complete!\n");
   } catch (error) {
-    console.error("❌ Error setting up VerificationCode schema:", error.message);
+    console.error(
+      "❌ Error setting up VerificationCode schema:",
+      error.message
+    );
     throw error;
   } finally {
     await db.close();

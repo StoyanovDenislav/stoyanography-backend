@@ -34,11 +34,9 @@ async function seedTimeSlots() {
     const customDates = await db.query(
       "SELECT date, isAvailable, customStartTime, customEndTime, notes FROM DateAvailability"
     );
-    
-    const dateAvailabilityMap = new Map(
-      customDates.map((d) => [d.date, d])
-    );
-    
+
+    const dateAvailabilityMap = new Map(customDates.map((d) => [d.date, d]));
+
     console.log(`  ✓ Found ${customDates.length} custom date configurations\n`);
 
     let slotsCreated = 0;
@@ -61,7 +59,11 @@ async function seedTimeSlots() {
       if (customAvailability && !customAvailability.isAvailable) {
         // Skip this date entirely (holiday, day off, etc.)
         slotsSkipped++;
-        console.log(`  ⊗ Skipping ${dateStr} - ${customAvailability.notes || "Unavailable"}`);
+        console.log(
+          `  ⊗ Skipping ${dateStr} - ${
+            customAvailability.notes || "Unavailable"
+          }`
+        );
         continue;
       }
 
@@ -72,13 +74,24 @@ async function seedTimeSlots() {
 
       // Define working hours
       let startHour, endHour;
-      
-      if (customAvailability && customAvailability.customStartTime && customAvailability.customEndTime) {
+
+      if (
+        customAvailability &&
+        customAvailability.customStartTime &&
+        customAvailability.customEndTime
+      ) {
         // Use custom hours for this specific date
         [startHour] = customAvailability.customStartTime.split(":").map(Number);
         [endHour] = customAvailability.customEndTime.split(":").map(Number);
-        if (date.getDate() % 30 === 1) { // Log every ~month
-          console.log(`  ⚙️  Using custom hours for ${dateStr}: ${customAvailability.customStartTime} - ${customAvailability.customEndTime} (${customAvailability.notes || "Custom schedule"})`);
+        if (date.getDate() % 30 === 1) {
+          // Log every ~month
+          console.log(
+            `  ⚙️  Using custom hours for ${dateStr}: ${
+              customAvailability.customStartTime
+            } - ${customAvailability.customEndTime} (${
+              customAvailability.notes || "Custom schedule"
+            })`
+          );
         }
       } else if (dayOfWeek === 6) {
         // Saturday

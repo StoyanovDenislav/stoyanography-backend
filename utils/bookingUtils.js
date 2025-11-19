@@ -107,7 +107,9 @@ class BookingUtils {
       // Invalidate slots cache (clear all to be safe)
       slotsCache.clear();
 
-      console.log(`✅ Created booking ${bookingNumber} for ${bookingData.date} ${bookingData.startTime}`);
+      console.log(
+        `✅ Created booking ${bookingNumber} for ${bookingData.date} ${bookingData.startTime}`
+      );
 
       return booking;
     } finally {
@@ -514,7 +516,9 @@ class BookingUtils {
    * Generates slots on-the-fly based on settings and date availability
    */
   static async getAvailableSlots(startDate, endDate, serviceDuration = null) {
-    const cacheKey = `slots_${startDate}_${endDate}_${serviceDuration || 'default'}`;
+    const cacheKey = `slots_${startDate}_${endDate}_${
+      serviceDuration || "default"
+    }`;
 
     // Check cache first
     const cached = slotsCache.get(cacheKey);
@@ -526,7 +530,9 @@ class BookingUtils {
     try {
       await db.open();
 
-      console.log(`🔍 Generating dynamic slots from ${startDate} to ${endDate}`);
+      console.log(
+        `🔍 Generating dynamic slots from ${startDate} to ${endDate}`
+      );
       const startTime = Date.now();
 
       // Get settings
@@ -545,13 +551,15 @@ class BookingUtils {
         { params: { startDate, endDate } }
       );
 
-      const dateAvailabilityMap = new Map(
-        customDates.map((d) => [d.date, d])
-      );
+      const dateAvailabilityMap = new Map(customDates.map((d) => [d.date, d]));
 
       // Get all bookings in the date range
-      const bookings = await this.getBookingsByDateRange(startDate, endDate, null);
-      
+      const bookings = await this.getBookingsByDateRange(
+        startDate,
+        endDate,
+        null
+      );
+
       // Group bookings by date for faster lookup
       const bookingsByDate = new Map();
       bookings.forEach((booking) => {
@@ -564,7 +572,9 @@ class BookingUtils {
 
       // Calculate minimum booking time
       const now = new Date();
-      const minBookingTime = new Date(now.getTime() + minAdvanceHours * 60 * 60 * 1000);
+      const minBookingTime = new Date(
+        now.getTime() + minAdvanceHours * 60 * 60 * 1000
+      );
 
       // Generate slots dynamically
       const availableSlots = [];
@@ -599,10 +609,17 @@ class BookingUtils {
         // Determine working hours for this date
         let startHour, startMinute, endHour, endMinute;
 
-        if (customAvailability?.customStartTime && customAvailability?.customEndTime) {
+        if (
+          customAvailability?.customStartTime &&
+          customAvailability?.customEndTime
+        ) {
           // Use custom hours
-          [startHour, startMinute] = customAvailability.customStartTime.split(":").map(Number);
-          [endHour, endMinute] = customAvailability.customEndTime.split(":").map(Number);
+          [startHour, startMinute] = customAvailability.customStartTime
+            .split(":")
+            .map(Number);
+          [endHour, endMinute] = customAvailability.customEndTime
+            .split(":")
+            .map(Number);
         } else {
           // Use default hours
           [startHour, startMinute] = defaultStartTime.split(":").map(Number);
@@ -620,8 +637,12 @@ class BookingUtils {
           const slotEndHour = Math.floor(slotEndMinutes / 60);
           const slotEndMinute = slotEndMinutes % 60;
 
-          const slotStart = `${String(slotStartHour).padStart(2, "0")}:${String(slotStartMinute).padStart(2, "0")}`;
-          const slotEnd = `${String(slotEndHour).padStart(2, "0")}:${String(slotEndMinute).padStart(2, "0")}`;
+          const slotStart = `${String(slotStartHour).padStart(2, "0")}:${String(
+            slotStartMinute
+          ).padStart(2, "0")}`;
+          const slotEnd = `${String(slotEndHour).padStart(2, "0")}:${String(
+            slotEndMinute
+          ).padStart(2, "0")}`;
 
           // Create slot datetime for comparison
           const slotDateTime = new Date(`${dateStr}T${slotStart}:00`);
@@ -644,12 +665,12 @@ class BookingUtils {
               // 2. Slot ends during the booking (slotEnd > bookingStart && slotEnd <= bookingEnd)
               // 3. Slot completely contains the booking (slotStart <= bookingStart && slotEnd >= bookingEnd)
               // 4. Booking completely contains the slot (bookingStart <= slotStart && bookingEnd >= slotEnd)
-              
-              const hasOverlap = 
-                (slotStart >= bookingStart && slotStart < bookingEnd) ||   // Slot starts during booking
-                (slotEnd > bookingStart && slotEnd <= bookingEnd) ||       // Slot ends during booking
-                (slotStart <= bookingStart && slotEnd >= bookingEnd) ||    // Slot contains booking
-                (bookingStart <= slotStart && bookingEnd >= slotEnd);      // Booking contains slot
+
+              const hasOverlap =
+                (slotStart >= bookingStart && slotStart < bookingEnd) || // Slot starts during booking
+                (slotEnd > bookingStart && slotEnd <= bookingEnd) || // Slot ends during booking
+                (slotStart <= bookingStart && slotEnd >= bookingEnd) || // Slot contains booking
+                (bookingStart <= slotStart && bookingEnd >= slotEnd); // Booking contains slot
 
               if (hasOverlap) {
                 isAvailable = false;
@@ -672,7 +693,11 @@ class BookingUtils {
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      console.log(`✅ Generated ${availableSlots.length} available slots in ${Date.now() - startTime}ms`);
+      console.log(
+        `✅ Generated ${availableSlots.length} available slots in ${
+          Date.now() - startTime
+        }ms`
+      );
 
       // Cache the results
       slotsCache.set(cacheKey, {
@@ -882,7 +907,9 @@ class BookingUtils {
         params: { date },
       });
 
-      console.log(`✓ Removed custom availability for ${date} (reverted to default)`);
+      console.log(
+        `✓ Removed custom availability for ${date} (reverted to default)`
+      );
 
       // Clear slots cache to regenerate with default settings
       slotsCache.clear();
@@ -908,9 +935,12 @@ class BookingUtils {
       await db.open();
 
       // Delete any existing unused codes for this email (cleanup)
-      await db.query("DELETE VERTEX VerificationCode WHERE email = :email AND used = false", {
-        params: { email: email.toLowerCase() },
-      });
+      await db.query(
+        "DELETE VERTEX VerificationCode WHERE email = :email AND used = false",
+        {
+          params: { email: email.toLowerCase() },
+        }
+      );
 
       const code = this.generateVerificationCode();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -963,7 +993,10 @@ class BookingUtils {
       );
 
       if (result.length === 0) {
-        return { valid: false, message: "Invalid or expired verification code" };
+        return {
+          valid: false,
+          message: "Invalid or expired verification code",
+        };
       }
 
       // Mark code as used

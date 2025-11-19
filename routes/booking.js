@@ -802,7 +802,10 @@ router.get("/my-bookings", async (req, res) => {
     console.log("📋 Decoded token:", decoded);
     console.log("📧 Email from token:", decoded.email);
     console.log("📧 Email type:", typeof decoded.email);
-    console.log("📧 Email length:", decoded.email ? decoded.email.length : "N/A");
+    console.log(
+      "📧 Email length:",
+      decoded.email ? decoded.email.length : "N/A"
+    );
     console.log("📧 Email is truthy:", !!decoded.email);
 
     if (!decoded.email) {
@@ -814,10 +817,10 @@ router.get("/my-bookings", async (req, res) => {
     }
 
     console.log("✅ About to fetch bookings for:", decoded.email);
-    
+
     // Get bookings for this email
     const bookings = await BookingUtils.getBookingsByEmail(decoded.email);
-    
+
     console.log("✅ Bookings fetched successfully, count:", bookings.length);
 
     // Format bookings for response
