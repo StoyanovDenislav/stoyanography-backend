@@ -1,4 +1,4 @@
-const cacheManager = require("../utils/CacheManager");
+const fetchLink = require("../utils/fetchLink");
 
 async function fetchImageHandler(req, res) {
   const { path } = req.query;
@@ -12,23 +12,16 @@ async function fetchImageHandler(req, res) {
   console.log(`fetchImageHandler received path: ${path}`);
 
   try {
-    // Use cache manager for caching
-    const result = await cacheManager.getCachedImage(path);
+    // Fetch image directly without caching
+    const result = await fetchLink(path);
 
-    // Set caching headers based on environment
-    const isDev = process.env.NODE_ENV === "development";
-    if (isDev) {
-      // No caching in development mode
-      res.setHeader(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, proxy-revalidate"
-      );
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-    } else {
-      // Cache for 24 hours in production (images rarely change)
-      res.setHeader("Cache-Control", "public, max-age=86400");
-    }
+    // Set no-cache headers
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
 
     res.status(200).json(result);
   } catch (error) {

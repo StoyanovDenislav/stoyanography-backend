@@ -1,4 +1,4 @@
-const cacheManager = require("../utils/CacheManager");
+const processNewConfig = require("../utils/processNewConfig");
 
 async function fetchPhotoCollectionHandler(req, res) {
   const { path, category, name } = req.query;
@@ -19,27 +19,23 @@ async function fetchPhotoCollectionHandler(req, res) {
   }
 
   try {
-    // Use cache manager for threaded processing and caching
-    const result = await cacheManager.getCachedPhotoCollection(
-      path,
-      category,
-      name
-    );
+    // Process config directly without caching
+    const fullConfig = await processNewConfig(path);
 
-    // Set caching headers based on environment
-    const isDev = process.env.NODE_ENV === "development";
-    if (isDev) {
-      // No caching in development mode
-      res.setHeader(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, proxy-revalidate"
-      );
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-    } else {
-      // Cache for 6 hours in production (collections change less frequently)
-      res.setHeader("Cache-Control", "public, max-age=21600");
+    // Extract the specific photo collection
+    const result = fullConfig?.PhotoCollections?.[category]?.[name];
+
+    if (!result) {
+      return res.status(404).json({ error: "Photo collection not found" });
     }
+
+    // Set no-cache headers
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
 
     res.status(200).json(result);
   } catch (error) {
