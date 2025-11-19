@@ -1,19 +1,31 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
+const jwt = require("jsonwebtoken");
 const BookingUtils = require("../utils/bookingUtils");
 const {
   sendBookingConfirmation,
   sendAdminNotification,
+  sendVerificationCode,
 } = require("../utils/bookingEmailer");
 
 const router = express.Router();
+
+// JWT secret for customer verification tokens
+const CUSTOMER_TOKEN_SECRET = process.env.CUSTOMER_TOKEN_SECRET;
 
 // Rate limiting for booking endpoints
 const bookingLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // limit each IP to 10 booking requests per windowMs
   message: "Too many booking requests, please try again later.",
+});
+
+// Rate limiting for verification code requests
+const verificationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 verification requests per 15 minutes
+  message: "Too many verification requests, please try again later.",
 });
 
 // ================================================
@@ -75,12 +87,13 @@ router.get("/availability", async (req, res) => {
       });
     }
 
-    // Limit the range to 90 days
+    // Allow reasonable date ranges (up to 365 days for infinite calendar support)
     const daysDiff = (end - start) / (1000 * 60 * 60 * 24);
-    if (daysDiff > 90) {
+    if (daysDiff > 365) {
       return res.status(400).json({
         success: false,
-        error: "Date range cannot exceed 90 days",
+        error:
+          "Date range cannot exceed 365 days. Please use smaller ranges for better performance.",
       });
     }
 
@@ -191,24 +204,12 @@ router.get("/check-availability", async (req, res) => {
       });
     }
 
-    // Check if date is too far in the future
+    // REMOVED: No limit on advance booking - infinite calendar like Windows
+    // Users can book as far into the future as they want
+
+    // Check if date is in the past
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const maxDate = new Date(today);
-    maxDate.setDate(maxDate.getDate() + settings.advanceBookingDays);
-
-    if (requestedDate > maxDate) {
-      return res.json({
-        success: true,
-        availableTimes: [],
-        message: "Date is too far in advance",
-      });
-    }
-
-    // Check if date is too soon
-    const minDate = new Date();
-    minDate.setHours(minDate.getHours() + settings.minAdvanceHours);
-    minDate.setMinutes(0, 0, 0);
 
     if (requestedDate < today) {
       return res.json({
@@ -613,43 +614,332 @@ router.post(
   }
 );
 
+// ================================================
+// CUSTOMER SELF-SERVICE ENDPOINTS (EMAIL VERIFICATION)
+// ================================================
+
+/**
+ * POST /api/booking/request-verification
+ * Request a verification code to access bookings
+ */
+router.post(
+  "/request-verification",
+  verificationLimiter,
+  [
+    body("email")
+      .isEmail()
+      .normalizeEmail()
+      .withMessage("Valid email is required"),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
+      }
+
+      const { email } = req.body;
+
+      // Check if this email has any bookings
+      const bookings = await BookingUtils.getBookingsByEmail(email);
+
+      if (bookings.length === 0) {
+        // Don't reveal if email exists or not for privacy
+        return res.json({
+          success: true,
+          message:
+            "If this email has bookings, a verification code has been sent.",
+        });
+      }
+
+      // Generate and store verification code
+      const code = await BookingUtils.createVerificationCode(email);
+
+      // Send email with code
+      const emailResult = await sendVerificationCode(email, code);
+
+      if (!emailResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to send verification email",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Verification code sent to your email",
+      });
+    } catch (error) {
+      console.error("Error requesting verification:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to process verification request",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/booking/verify-code
+ * Verify the code and issue a JWT token for booking access
+ */
+router.post(
+  "/verify-code",
+  [
+    body("email")
+      .isEmail()
+      .normalizeEmail()
+      .withMessage("Valid email is required"),
+    body("code")
+      .isString()
+      .isLength({ min: 6, max: 6 })
+      .withMessage("Verification code must be 6 digits"),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
+      }
+
+      const { email, code } = req.body;
+
+      // Verify the code
+      const verification = await BookingUtils.verifyCode(email, code);
+
+      if (!verification.valid) {
+        return res.status(401).json({
+          success: false,
+          error: verification.message || "Invalid verification code",
+        });
+      }
+
+      // Generate JWT token valid for 5 minutes
+      const token = jwt.sign(
+        {
+          email: email.toLowerCase(),
+          type: "customer-booking-access",
+        },
+        CUSTOMER_TOKEN_SECRET,
+        { expiresIn: "5m" }
+      );
+
+      res.json({
+        success: true,
+        token,
+        expiresIn: 300, // 5 minutes in seconds
+        message: "Verification successful",
+      });
+    } catch (error) {
+      console.error("Error verifying code:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to verify code",
+      });
+    }
+  }
+);
+
 /**
  * GET /api/booking/my-bookings
- * Get bookings by customer email
+ * Get bookings for the authenticated customer (JWT protected)
  */
 router.get("/my-bookings", async (req, res) => {
   try {
-    const { email } = req.query;
+    console.log("📨 my-bookings endpoint hit");
+    console.log("📋 Headers:", req.headers);
 
-    if (!email) {
-      return res.status(400).json({
+    // Extract token from Authorization header
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+
+    console.log("🔑 Token extracted:", token ? "YES" : "NO");
+
+    if (!token) {
+      console.log("❌ No token provided");
+      return res.status(401).json({
         success: false,
-        error: "Email is required",
+        error: "Access token required",
       });
     }
 
-    const bookings = await BookingUtils.getBookingsByEmail(email);
+    // Verify JWT token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, CUSTOMER_TOKEN_SECRET);
+      console.log("✅ Token verified successfully");
+      console.log("📋 Decoded token:", JSON.stringify(decoded, null, 2));
+    } catch (error) {
+      console.log("❌ Token verification failed:", error.message);
+      if (error.name === "TokenExpiredError") {
+        return res.status(401).json({
+          success: false,
+          error: "Token expired. Please verify your email again.",
+          expired: true,
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        error: "Invalid token",
+      });
+    }
 
+    // Verify token type
+    if (decoded.type !== "customer-booking-access") {
+      console.log("❌ Invalid token type:", decoded.type);
+      return res.status(401).json({
+        success: false,
+        error: "Invalid token type",
+      });
+    }
+
+    console.log("📋 Decoded token:", decoded);
+    console.log("📧 Email from token:", decoded.email);
+    console.log("📧 Email type:", typeof decoded.email);
+    console.log("📧 Email length:", decoded.email ? decoded.email.length : "N/A");
+    console.log("📧 Email is truthy:", !!decoded.email);
+
+    if (!decoded.email) {
+      console.log("❌ No email in decoded token!");
+      return res.status(400).json({
+        success: false,
+        error: "Email not found in token",
+      });
+    }
+
+    console.log("✅ About to fetch bookings for:", decoded.email);
+    
+    // Get bookings for this email
+    const bookings = await BookingUtils.getBookingsByEmail(decoded.email);
+    
+    console.log("✅ Bookings fetched successfully, count:", bookings.length);
+
+    // Format bookings for response
     const formattedBookings = bookings.map((booking) => ({
       bookingNumber: booking.bookingNumber,
-      customerName: booking.customerName,
       date: booking.date,
       startTime: booking.startTime,
       endTime: booking.endTime,
-      status: booking.status,
       serviceName: booking.serviceName,
+      status: booking.status,
+      customerName: booking.customerName,
+      customerEmail: booking.customerEmail,
+      customerPhone: booking.customerPhone,
+      notes: booking.notes,
       createdAt: booking.createdAt,
     }));
 
     res.json({
       success: true,
       bookings: formattedBookings,
+      email: decoded.email,
     });
   } catch (error) {
-    console.error("Error fetching customer bookings:", error);
+    console.error("Error fetching my bookings:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch bookings",
+    });
+  }
+});
+
+/**
+ * POST /api/booking/cancel-my-booking
+ * Cancel a booking (JWT protected, customer can only cancel their own bookings)
+ */
+router.post("/cancel-my-booking", async (req, res) => {
+  try {
+    // Extract token from Authorization header
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: "Access token required",
+      });
+    }
+
+    // Verify JWT token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, CUSTOMER_TOKEN_SECRET);
+    } catch (error) {
+      if (error.name === "TokenExpiredError") {
+        return res.status(401).json({
+          success: false,
+          error: "Token expired. Please verify your email again.",
+          expired: true,
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        error: "Invalid token",
+      });
+    }
+
+    // Verify token type
+    if (decoded.type !== "customer-booking-access") {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid token type",
+      });
+    }
+
+    const { bookingNumber } = req.body;
+
+    if (!bookingNumber) {
+      return res.status(400).json({
+        success: false,
+        error: "Booking number is required",
+      });
+    }
+
+    // Get the booking to verify ownership
+    const booking = await BookingUtils.getBookingByNumber(bookingNumber);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        error: "Booking not found",
+      });
+    }
+
+    // Verify the booking belongs to this customer
+    if (booking.customerEmail.toLowerCase() !== decoded.email.toLowerCase()) {
+      return res.status(403).json({
+        success: false,
+        error: "You can only cancel your own bookings",
+      });
+    }
+
+    // Check if booking is already cancelled
+    if (booking.status === "cancelled") {
+      return res.status(400).json({
+        success: false,
+        error: "Booking is already cancelled",
+      });
+    }
+
+    // Cancel the booking
+    await BookingUtils.cancelBooking(bookingNumber);
+
+    res.json({
+      success: true,
+      message: "Booking cancelled successfully",
+      bookingNumber,
+    });
+  } catch (error) {
+    console.error("Error cancelling booking:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to cancel booking",
     });
   }
 });

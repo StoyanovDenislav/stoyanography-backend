@@ -446,4 +446,132 @@ router.put("/settings/:key", async (req, res) => {
   }
 });
 
+// ================================================
+// DATE AVAILABILITY ADMIN ENDPOINTS
+// ================================================
+
+/**
+ * GET /admin/date-availability
+ * Get all custom date availability configurations
+ * Query params: startDate, endDate (optional)
+ */
+router.get("/date-availability", async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const dateAvailability = await BookingUtils.getDateAvailability(
+      startDate,
+      endDate
+    );
+
+    res.json({
+      success: true,
+      dateAvailability,
+      count: dateAvailability.length,
+    });
+  } catch (error) {
+    console.error("Error fetching date availability:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /admin/date-availability/:date
+ * Get custom availability for a specific date
+ */
+router.get("/date-availability/:date", async (req, res) => {
+  try {
+    const { date } = req.params;
+
+    const availability = await BookingUtils.getDateAvailabilityForDate(date);
+
+    res.json({
+      success: true,
+      availability,
+    });
+  } catch (error) {
+    console.error("Error fetching date availability:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /admin/date-availability
+ * Set custom availability for a date
+ * Body: { date, isAvailable, customStartTime, customEndTime, notes }
+ */
+router.post(
+  "/date-availability",
+  [
+    body("date")
+      .notEmpty()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage("Date must be in YYYY-MM-DD format"),
+    body("isAvailable").isBoolean().withMessage("isAvailable must be boolean"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
+    try {
+      const { date, isAvailable, customStartTime, customEndTime, notes } =
+        req.body;
+
+      const availability = await BookingUtils.setDateAvailability({
+        date,
+        isAvailable,
+        customStartTime,
+        customEndTime,
+        notes,
+      });
+
+      res.json({
+        success: true,
+        message: "Date availability updated successfully",
+        availability,
+      });
+    } catch (error) {
+      console.error("Error setting date availability:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /admin/date-availability/:date
+ * Remove custom availability for a date (revert to default)
+ */
+router.delete("/date-availability/:date", async (req, res) => {
+  try {
+    const { date } = req.params;
+
+    await BookingUtils.deleteDateAvailability(date);
+
+    res.json({
+      success: true,
+      message: "Date availability removed successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting date availability:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

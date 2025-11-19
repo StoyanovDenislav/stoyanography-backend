@@ -325,8 +325,79 @@ async function sendCancellationEmail(booking) {
   }
 }
 
+/**
+ * Send verification code email
+ */
+async function sendVerificationCode(email, code) {
+  const mailOptions = {
+    from: '"Stoyanography" <support@stoyanography.com>',
+    to: email,
+    subject: `Your Booking Verification Code`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .code-box { background: white; padding: 30px; margin: 20px 0; border: 3px dashed #e87722; border-radius: 10px; text-align: center; }
+            .code { font-size: 48px; font-weight: bold; color: #e87722; letter-spacing: 8px; font-family: 'Courier New', monospace; }
+            .warning { background: #fff8f3; padding: 15px; margin: 20px 0; border-left: 4px solid #e87722; border-radius: 5px; }
+            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+            .info-text { color: #666; font-size: 14px; margin: 10px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔐 Verification Code</h1>
+            </div>
+            <div class="content">
+              <p>Hello,</p>
+              <p>You requested to view your bookings. Please use the verification code below to access your booking information:</p>
+              
+              <div class="code-box">
+                <div class="code">${code}</div>
+                <p class="info-text">Enter this code to verify your identity</p>
+              </div>
+
+              <div class="warning">
+                <p style="margin: 0;"><strong>⏰ Important:</strong></p>
+                <ul style="margin: 5px 0;">
+                  <li>This code expires in <strong>15 minutes</strong></li>
+                  <li>Do not share this code with anyone</li>
+                  <li>If you didn't request this code, please ignore this email</li>
+                </ul>
+              </div>
+
+              <p>After verification, you'll have 5 minutes to view and manage your bookings without needing to enter the code again.</p>
+
+              <div class="footer">
+                <p>This is an automated email from Stoyanography</p>
+                <p>If you have any questions, please contact us at support@stoyanography.com</p>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Verification code email sent:", info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending verification code email:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   sendBookingConfirmation,
   sendAdminNotification,
   sendCancellationEmail,
+  sendVerificationCode,
 };

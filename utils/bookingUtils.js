@@ -67,6 +67,7 @@ class BookingUtils {
 
   /**
    * Create a new booking
+   * NO LONGER UPDATES TimeSlot TABLE - slots are generated dynamically
    */
   static async createBooking(bookingData) {
     try {
@@ -100,24 +101,13 @@ class BookingUtils {
         })
         .one();
 
-      // Mark the time slot as booked
-      await db.query(
-        `UPDATE TimeSlot SET isBooked = true 
-         WHERE date = :date AND startTime = :startTime`,
-        {
-          params: {
-            date: bookingData.date,
-            startTime: bookingData.startTime,
-          },
-        }
-      );
-
       // Invalidate booking cache
       invalidateBookingCache();
 
-      // Invalidate slots cache for this date
-      const slotCacheKey = `${bookingData.date}`;
-      slotsCache.delete(slotCacheKey);
+      // Invalidate slots cache (clear all to be safe)
+      slotsCache.clear();
+
+      console.log(`✅ Created booking ${bookingNumber} for ${bookingData.date} ${bookingData.startTime}`);
 
       return booking;
     } finally {
@@ -520,99 +510,175 @@ class BookingUtils {
   }
 
   /**
-   * Get available time slots for booking (with caching)
+   * Get available time slots for booking (DYNAMIC - NO DATABASE SEEDING REQUIRED)
+   * Generates slots on-the-fly based on settings and date availability
    */
   static async getAvailableSlots(startDate, endDate, serviceDuration = null) {
-    const cacheKey = `slots_${startDate}_${endDate}`;
+    const cacheKey = `slots_${startDate}_${endDate}_${serviceDuration || 'default'}`;
 
     // Check cache first
     const cached = slotsCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log("✓ Returning cached slots");
+      console.log("📦 Returning cached slots");
       return cached.data;
     }
 
     try {
       await db.open();
 
-      // Query time slots from database
-      const dbSlots = await db.query(
-        `SELECT date, startTime, endTime, isBooked 
-         FROM TimeSlot 
-         WHERE date >= :startDate AND date <= :endDate 
-         AND isBooked = false 
-         ORDER BY date, startTime`,
-        {
-          params: { startDate, endDate },
-        }
+      console.log(`🔍 Generating dynamic slots from ${startDate} to ${endDate}`);
+      const startTime = Date.now();
+
+      // Get settings
+      const settings = await this.getSettings();
+      const workingDays = settings.workingDays || [1, 2, 3, 4, 5]; // Mon-Fri default
+      const defaultStartTime = settings.workingHoursStart || "09:00";
+      const defaultEndTime = settings.workingHoursEnd || "18:00";
+      const slotDuration = settings.slotDuration || 30;
+      const minAdvanceHours = settings.minAdvanceHours || 24;
+
+      // Get all custom date availabilities in this range
+      const customDates = await db.query(
+        `SELECT date, isAvailable, customStartTime, customEndTime, notes 
+         FROM DateAvailability 
+         WHERE date >= :startDate AND date <= :endDate`,
+        { params: { startDate, endDate } }
+      );
+
+      const dateAvailabilityMap = new Map(
+        customDates.map((d) => [d.date, d])
       );
 
       // Get all bookings in the date range
-      const bookings = await this.getBookingsByDateRange(
-        startDate,
-        endDate,
-        null
-      );
+      const bookings = await this.getBookingsByDateRange(startDate, endDate, null);
+      
+      // Group bookings by date for faster lookup
+      const bookingsByDate = new Map();
+      bookings.forEach((booking) => {
+        const dateKey = booking.date.split("T")[0];
+        if (!bookingsByDate.has(dateKey)) {
+          bookingsByDate.set(dateKey, []);
+        }
+        bookingsByDate.get(dateKey).push(booking);
+      });
 
-      // Convert db slots to plain objects
-      const slots = dbSlots.map((slot) => ({
-        date: slot.date,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-      }));
-
-      // Filter out booked slots and past slots
-      const availableSlots = [];
-      const settings = await this.getSettings();
+      // Calculate minimum booking time
       const now = new Date();
-      const minAdvanceHours = settings.minAdvanceHours || 24;
-      const minBookingTime = new Date(
-        now.getTime() + minAdvanceHours * 60 * 60 * 1000
-      );
+      const minBookingTime = new Date(now.getTime() + minAdvanceHours * 60 * 60 * 1000);
 
-      for (const slot of slots) {
-        let isAvailable = true;
+      // Generate slots dynamically
+      const availableSlots = [];
+      const currentDate = new Date(startDate);
+      const end = new Date(endDate);
 
-        // Check if slot conflicts with any booking
-        for (const booking of bookings) {
-          if (
-            booking.status !== "cancelled" &&
-            booking.date.split("T")[0] === slot.date
-          ) {
-            const bookingStart = booking.startTime;
-            const bookingEnd = booking.endTime;
-            const slotStart = slot.startTime;
-            const slotEnd = slot.endTime;
+      while (currentDate <= end) {
+        const dayOfWeek = currentDate.getDay();
+        const dateStr = currentDate.toISOString().split("T")[0];
 
-            // Check for overlap
-            if (
-              (slotStart >= bookingStart && slotStart < bookingEnd) ||
-              (slotEnd > bookingStart && slotEnd <= bookingEnd) ||
-              (slotStart <= bookingStart && slotEnd >= bookingEnd)
-            ) {
-              isAvailable = false;
-              break;
+        // Check if this date has custom availability
+        const customAvailability = dateAvailabilityMap.get(dateStr);
+
+        // Skip if date is marked as unavailable
+        if (customAvailability && !customAvailability.isAvailable) {
+          currentDate.setDate(currentDate.getDate() + 1);
+          continue;
+        }
+
+        // Skip Sundays by default (unless custom availability overrides)
+        if (dayOfWeek === 0 && !customAvailability) {
+          currentDate.setDate(currentDate.getDate() + 1);
+          continue;
+        }
+
+        // Skip if not a working day (unless custom availability overrides)
+        if (!workingDays.includes(dayOfWeek) && !customAvailability) {
+          currentDate.setDate(currentDate.getDate() + 1);
+          continue;
+        }
+
+        // Determine working hours for this date
+        let startHour, startMinute, endHour, endMinute;
+
+        if (customAvailability?.customStartTime && customAvailability?.customEndTime) {
+          // Use custom hours
+          [startHour, startMinute] = customAvailability.customStartTime.split(":").map(Number);
+          [endHour, endMinute] = customAvailability.customEndTime.split(":").map(Number);
+        } else {
+          // Use default hours
+          [startHour, startMinute] = defaultStartTime.split(":").map(Number);
+          [endHour, endMinute] = defaultEndTime.split(":").map(Number);
+        }
+
+        let currentMinutes = startHour * 60 + startMinute;
+        const endMinutes = endHour * 60 + endMinute;
+
+        // Generate slots for this day
+        while (currentMinutes + slotDuration <= endMinutes) {
+          const slotStartHour = Math.floor(currentMinutes / 60);
+          const slotStartMinute = currentMinutes % 60;
+          const slotEndMinutes = currentMinutes + slotDuration;
+          const slotEndHour = Math.floor(slotEndMinutes / 60);
+          const slotEndMinute = slotEndMinutes % 60;
+
+          const slotStart = `${String(slotStartHour).padStart(2, "0")}:${String(slotStartMinute).padStart(2, "0")}`;
+          const slotEnd = `${String(slotEndHour).padStart(2, "0")}:${String(slotEndMinute).padStart(2, "0")}`;
+
+          // Create slot datetime for comparison
+          const slotDateTime = new Date(`${dateStr}T${slotStart}:00`);
+
+          // Skip if slot is in the past or within minimum advance time
+          if (slotDateTime >= minBookingTime) {
+            // Check if slot conflicts with any booking
+            let isAvailable = true;
+            const dayBookings = bookingsByDate.get(dateStr) || [];
+
+            for (const booking of dayBookings) {
+              if (booking.status === "cancelled") continue;
+
+              const bookingStart = booking.startTime;
+              const bookingEnd = booking.endTime;
+
+              // Check for ANY overlap between slot and booking
+              // Slot overlaps if:
+              // 1. Slot starts during the booking (slotStart >= bookingStart && slotStart < bookingEnd)
+              // 2. Slot ends during the booking (slotEnd > bookingStart && slotEnd <= bookingEnd)
+              // 3. Slot completely contains the booking (slotStart <= bookingStart && slotEnd >= bookingEnd)
+              // 4. Booking completely contains the slot (bookingStart <= slotStart && bookingEnd >= slotEnd)
+              
+              const hasOverlap = 
+                (slotStart >= bookingStart && slotStart < bookingEnd) ||   // Slot starts during booking
+                (slotEnd > bookingStart && slotEnd <= bookingEnd) ||       // Slot ends during booking
+                (slotStart <= bookingStart && slotEnd >= bookingEnd) ||    // Slot contains booking
+                (bookingStart <= slotStart && bookingEnd >= slotEnd);      // Booking contains slot
+
+              if (hasOverlap) {
+                isAvailable = false;
+                break;
+              }
+            }
+
+            if (isAvailable) {
+              availableSlots.push({
+                date: dateStr,
+                startTime: slotStart,
+                endTime: slotEnd,
+              });
             }
           }
+
+          currentMinutes += slotDuration;
         }
 
-        // Check if slot is in the past or too soon
-        const slotDateTime = new Date(`${slot.date}T${slot.startTime}`);
-        if (slotDateTime < minBookingTime) {
-          isAvailable = false;
-        }
-
-        if (isAvailable) {
-          availableSlots.push(slot);
-        }
+        currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      // Cache the result
+      console.log(`✅ Generated ${availableSlots.length} available slots in ${Date.now() - startTime}ms`);
+
+      // Cache the results
       slotsCache.set(cacheKey, {
         data: availableSlots,
         timestamp: Date.now(),
       });
-      console.log("✓ Cached slots for:", cacheKey);
 
       return availableSlots;
     } finally {
@@ -620,9 +686,6 @@ class BookingUtils {
     }
   }
 
-  /**
-   * Get booking statistics
-   */
   /**
    * Get booking statistics with caching
    */
@@ -683,6 +746,296 @@ class BookingUtils {
       setCache(bookingsCache, cacheKey, stats);
 
       return stats;
+    } finally {
+      await db.close();
+    }
+  }
+
+  // ================================================
+  // DATE AVAILABILITY METHODS
+  // ================================================
+
+  /**
+   * Get custom date availability configurations
+   * @param {string} startDate - Optional start date filter (YYYY-MM-DD)
+   * @param {string} endDate - Optional end date filter (YYYY-MM-DD)
+   */
+  static async getDateAvailability(startDate = null, endDate = null) {
+    try {
+      await db.open();
+
+      let query = "SELECT * FROM DateAvailability";
+      const params = {};
+
+      if (startDate && endDate) {
+        query += " WHERE date >= :start AND date <= :end";
+        params.start = startDate;
+        params.end = endDate;
+      } else if (startDate) {
+        query += " WHERE date >= :start";
+        params.start = startDate;
+      }
+
+      query += " ORDER BY date ASC";
+
+      const availability = await db.query(query, { params });
+      return availability;
+    } finally {
+      await db.close();
+    }
+  }
+
+  /**
+   * Get custom availability for a specific date
+   * @param {string} date - Date in YYYY-MM-DD format
+   */
+  static async getDateAvailabilityForDate(date) {
+    try {
+      await db.open();
+
+      const result = await db.query(
+        "SELECT * FROM DateAvailability WHERE date = :date",
+        { params: { date } }
+      );
+
+      return result[0] || null;
+    } finally {
+      await db.close();
+    }
+  }
+
+  /**
+   * Set custom availability for a date
+   * @param {Object} availabilityData - { date, isAvailable, customStartTime, customEndTime, notes }
+   */
+  static async setDateAvailability(availabilityData) {
+    try {
+      await db.open();
+
+      const { date, isAvailable, customStartTime, customEndTime, notes } =
+        availabilityData;
+
+      // Check if record exists
+      const existing = await db.query(
+        "SELECT * FROM DateAvailability WHERE date = :date",
+        { params: { date } }
+      );
+
+      const now = new Date().toISOString();
+
+      if (existing.length > 0) {
+        // Update existing record
+        const updated = await db
+          .update(existing[0]["@rid"])
+          .set({
+            isAvailable,
+            customStartTime: customStartTime || null,
+            customEndTime: customEndTime || null,
+            notes: notes || "",
+            updatedAt: now,
+          })
+          .one();
+
+        console.log(`✓ Updated custom availability for ${date}`);
+
+        // Clear slots cache to regenerate with new availability
+        slotsCache.clear();
+
+        return updated;
+      } else {
+        // Create new record
+        const created = await db
+          .insert()
+          .into("DateAvailability")
+          .set({
+            date,
+            isAvailable,
+            customStartTime: customStartTime || null,
+            customEndTime: customEndTime || null,
+            notes: notes || "",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .one();
+
+        console.log(`✓ Created custom availability for ${date}`);
+
+        // Clear slots cache to regenerate with new availability
+        slotsCache.clear();
+
+        return created;
+      }
+    } finally {
+      await db.close();
+    }
+  }
+
+  /**
+   * Delete custom availability for a date (revert to default)
+   * @param {string} date - Date in YYYY-MM-DD format
+   */
+  static async deleteDateAvailability(date) {
+    try {
+      await db.open();
+
+      await db.query("DELETE FROM DateAvailability WHERE date = :date", {
+        params: { date },
+      });
+
+      console.log(`✓ Removed custom availability for ${date} (reverted to default)`);
+
+      // Clear slots cache to regenerate with default settings
+      slotsCache.clear();
+
+      return true;
+    } finally {
+      await db.close();
+    }
+  }
+
+  /**
+   * Generate a 6-digit verification code
+   */
+  static generateVerificationCode() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  /**
+   * Create a verification code for email verification
+   */
+  static async createVerificationCode(email) {
+    try {
+      await db.open();
+
+      // Delete any existing unused codes for this email (cleanup)
+      await db.query("DELETE VERTEX VerificationCode WHERE email = :email AND used = false", {
+        params: { email: email.toLowerCase() },
+      });
+
+      const code = this.generateVerificationCode();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      const createdAt = new Date();
+
+      const result = await db.query(
+        `INSERT INTO VerificationCode SET 
+         email = :email, 
+         code = :code, 
+         expiresAt = :expiresAt, 
+         used = false,
+         createdAt = :createdAt`,
+        {
+          params: {
+            email: email.toLowerCase(),
+            code,
+            expiresAt,
+            createdAt,
+          },
+        }
+      );
+
+      console.log(`✓ Created verification code for ${email}`);
+
+      return code;
+    } finally {
+      await db.close();
+    }
+  }
+
+  /**
+   * Verify a code for an email
+   */
+  static async verifyCode(email, code) {
+    try {
+      await db.open();
+
+      const result = await db.query(
+        `SELECT FROM VerificationCode 
+         WHERE email = :email 
+         AND code = :code 
+         AND used = false 
+         AND expiresAt > sysdate()`,
+        {
+          params: {
+            email: email.toLowerCase(),
+            code,
+          },
+        }
+      );
+
+      if (result.length === 0) {
+        return { valid: false, message: "Invalid or expired verification code" };
+      }
+
+      // Mark code as used
+      await db.query(
+        `UPDATE VerificationCode SET used = true WHERE email = :email AND code = :code`,
+        {
+          params: {
+            email: email.toLowerCase(),
+            code,
+          },
+        }
+      );
+
+      console.log(`✓ Verified code for ${email}`);
+
+      return { valid: true };
+    } finally {
+      await db.close();
+    }
+  }
+
+  /**
+   * Get all bookings for a specific email
+   */
+  static async getBookingsByEmail(email) {
+    if (!email) {
+      throw new Error("Email is required to fetch bookings");
+    }
+
+    try {
+      await db.open();
+
+      console.log(`📧 Fetching bookings for email: ${email}`);
+
+      const result = await db.query(
+        `SELECT FROM Booking 
+         WHERE customerEmail = :email 
+         ORDER BY date DESC, startTime DESC`,
+        {
+          params: {
+            email: email.toLowerCase(),
+          },
+        }
+      );
+
+      console.log(`✓ Retrieved ${result.length} bookings for ${email}`);
+
+      return result;
+    } finally {
+      await db.close();
+    }
+  }
+
+  /**
+   * Cleanup expired verification codes (call this periodically)
+   */
+  static async cleanupExpiredCodes() {
+    try {
+      await db.open();
+
+      const result = await db.query(
+        "DELETE VERTEX VerificationCode WHERE expiresAt < sysdate() OR (used = true AND createdAt < :cleanupDate)",
+        {
+          params: {
+            cleanupDate: new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
+          },
+        }
+      );
+
+      console.log(`✓ Cleaned up ${result} expired/used verification codes`);
+
+      return result;
     } finally {
       await db.close();
     }

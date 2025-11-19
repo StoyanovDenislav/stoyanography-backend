@@ -3,16 +3,16 @@ require("dotenv").config();
 
 const server = OrientDB({
   host: process.env.HOST || "localhost",
-  port: parseInt(process.env.PORT) || 2424,
-  username: process.env.DBADMIN || "root",
-  password: process.env.DBPASSWORD || "root",
+  port: parseInt(process.env.PORT),
+  username: process.env.DBADMIN,
+  password: process.env.DBPASSWORD,
   useToken: true,
 });
 
 const db = server.use({
-  name: process.env.DBNAME || "stoyanography",
-  username: process.env.DBADMIN || "root",
-  password: process.env.DBPASSWORD || "root",
+  name: process.env.DBNAME,
+  username: process.env.DBADMIN,
+  password: process.env.DBPASSWORD,
   useToken: true,
 });
 
